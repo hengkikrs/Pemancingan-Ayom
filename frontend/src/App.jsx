@@ -992,16 +992,7 @@ function LoginPage() {
           </form>
           <div
             style={{
-              marginTop: 16,
-              padding: "10px 14px",
-              background: C.gray50,
-              borderRadius: 9,
-              fontSize: 12,
-              color: C.gray500,
-            }}
-          >
-            Login: Inay / ayom2024 · Wembi / wembi · Gun / gun
-          </div>
+              
         </Card>
       </div>
     </div>
