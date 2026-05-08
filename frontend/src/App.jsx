@@ -3552,41 +3552,86 @@ function LaporanTab({ bp }) {
           .slice(0, 10)
       : startDate;
 
-  const download = async (type) => {
-    if (!API_URL) {
-      setToast({ msg: "Laporan PDF/Excel membutuhkan Backend Python yang sedang dinonaktifkan di Vercel. Silakan deploy backend ke platform lain (seperti Railway) dan isi VITE_API_URL.", type: "error" });
-      return;
-    }
-    
-    setLoading((l) => ({ ...l, [type]: true }));
-    try {
-      const url = `${API_URL}/api/report/${type}?start=${startDate}&period=${period}`;
-      const res = await fetch(url);
-      if (!res.ok)
-        throw new Error(
-          `Gagal memuat laporan (HTTP ${res.status}) — Pastikan API berjalan`,
-        );
-      const blob = await res.blob();
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `laporan_ayom_${startDate}.${type === "excel" ? "xlsx" : "pdf"}`;
-      a.click();
-      setToast({
-        msg: `Laporan ${type.toUpperCase()} berhasil diunduh!`,
-        type: "success",
-      });
-    } catch (e) {
-      setToast({ msg: "Gagal: " + e.message, type: "error" });
-    }
-    setLoading((l) => ({ ...l, [type]: false }));
-  };
-
   const filtS = sessions.filter(
     (s) => s.session_date >= startDate && s.session_date <= endDate,
   );
   const filtT = txns.filter(
     (t) => t.trans_date >= startDate && t.trans_date <= endDate,
   );
+
+  const download = async (type) => {
+    setLoading((l) => ({ ...l, [type]: true }));
+    try {
+      if (type === "excel") {
+        const XLSX = await import("xlsx");
+        const wb = XLSX.utils.book_new();
+        
+        const wsData = [
+          ["LAPORAN KEUANGAN PEMANCINGAN AYOM"],
+          [`Periode: ${startDate} sampai ${endDate}`],
+          [],
+          ["Tipe Transaksi", "Tanggal", "Deskripsi", "Pendapatan"]
+        ];
+        
+        let total = 0;
+        filtS.forEach(s => {
+          const val = s.participants * TICKET_PRICE;
+          total += val;
+          wsData.push(["Galatama", s.session_date, `Sesi ${s.session_num} (${s.participants} peserta)`, val]);
+        });
+        filtT.forEach(t => {
+          total += parseFloat(t.revenue);
+          wsData.push(["Warung", t.trans_date, `${t.qty} ${t.unit} ${t.product_name}`, parseFloat(t.revenue)]);
+        });
+        
+        wsData.push([]);
+        wsData.push(["", "", "TOTAL PENDAPATAN KOTOR", total]);
+        
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        XLSX.utils.book_append_sheet(wb, ws, "Laporan");
+        XLSX.writeFile(wb, `laporan_ayom_${startDate}.xlsx`);
+        setToast({ msg: "Laporan Excel berhasil diunduh!", type: "success" });
+      } else if (type === "pdf") {
+        const { jsPDF } = await import("jspdf");
+        await import("jspdf-autotable");
+        
+        const doc = new jsPDF();
+        doc.setFontSize(16);
+        doc.text("Laporan Keuangan Pemancingan Ayom", 14, 20);
+        doc.setFontSize(11);
+        doc.text(`Periode: ${startDate} s/d ${endDate}`, 14, 28);
+        
+        const tableData = [];
+        let total = 0;
+        filtS.forEach(s => {
+          const val = s.participants * TICKET_PRICE;
+          total += val;
+          tableData.push(["Galatama", s.session_date, `Sesi ${s.session_num} (${s.participants} peserta)`, fmt(val)]);
+        });
+        filtT.forEach(t => {
+          total += parseFloat(t.revenue);
+          tableData.push(["Warung", t.trans_date, `${t.qty} ${t.unit} ${t.product_name}`, fmt(parseFloat(t.revenue))]);
+        });
+        
+        tableData.push(["", "", "TOTAL PENDAPATAN", fmt(total)]);
+        
+        doc.autoTable({
+          startY: 34,
+          head: [["Tipe", "Tanggal", "Deskripsi", "Pendapatan"]],
+          body: tableData,
+          theme: 'striped',
+          headStyles: { fillColor: [21, 101, 192] },
+          footStyles: { fillColor: [255, 255, 255] }
+        });
+        
+        doc.save(`laporan_ayom_${startDate}.pdf`);
+        setToast({ msg: "Laporan PDF berhasil diunduh!", type: "success" });
+      }
+    } catch (e) {
+      setToast({ msg: "Gagal memuat modul PDF/Excel. Pastikan Anda sudah menjalankan 'npm install xlsx jspdf jspdf-autotable'", type: "error" });
+    }
+    setLoading((l) => ({ ...l, [type]: false }));
+  };
   const galRev = filtS.reduce((a, s) => a + s.participants * TICKET_PRICE, 0);
   const warRev = filtT.reduce((a, t) => a + parseFloat(t.revenue || 0), 0);
 
