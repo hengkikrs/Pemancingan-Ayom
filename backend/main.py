@@ -678,8 +678,9 @@ class LoginReq(BM):
 
 # Demo passwords (fallback jika Supabase users table belum diisi)
 DEMO_PASSWORDS = {
-    "admin":  "ayom2024",
-    "kasir":  "kasir123",
+    "inay": "ayom2024",
+    "wembi": "wembi",
+    "gun": "gun",
 }
 
 @app.post("/api/auth/verify")

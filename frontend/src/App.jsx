@@ -1000,7 +1000,7 @@ function LoginPage() {
               color: C.gray500,
             }}
           >
-            <strong>Demo:</strong> admin / ayom2024
+            Login: Inay / ayom2024 · Wembi / wembi · Gun / gun
           </div>
         </Card>
       </div>
