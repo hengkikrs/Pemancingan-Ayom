@@ -28,8 +28,6 @@ const DEMO_USERS = {
 };
 const DEMO_PASSWORDS = { admin: "ayom2024", kasir: "kasir123" };
 
-const API_URL = import.meta.env.VITE_API_URL || "";
-
 async function verifyLogin(username, password) {
   // 1. Coba Supabase dulu
   try {
@@ -42,25 +40,21 @@ async function verifyLogin(username, password) {
 
     if (!error && users?.length) {
       const user = users[0];
-      // Coba verifikasi via backend
+      // Verifikasi password via Supabase RPC (pgcrypto)
       try {
-        const res = await fetch(
-          `${API_URL}/api/auth/verify`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, password }),
-          },
-        );
-        if (res.ok) {
-          const json = await res.json();
-          return json.valid ? user : null;
-        }
-        throw new Error("Backend response not ok");
+        const { data: valid, error: rpcErr } = await supabase
+          .rpc("verify_password", {
+            p_username: username,
+            p_password: password,
+          });
+        if (!rpcErr && valid === true) return user;
+        if (!rpcErr && valid === false) return null;
+        // RPC error (fungsi belum dibuat?) → fallback demo
       } catch {
-        // Backend tidak jalan — cek demo password
-        if (DEMO_PASSWORDS[username] === password) return user;
+        // RPC tidak tersedia → fallback demo
       }
+      // Fallback: cek demo password
+      if (DEMO_PASSWORDS[username] === password) return user;
       return null;
     }
   } catch {
