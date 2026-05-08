@@ -22,29 +22,30 @@
 DELETE FROM public.users WHERE username IN ('admin', 'kasir');
 
 -- ─── Users ───────────────────────────────────────────────────
--- Hash dibawah adalah bcrypt(cost=12) dari password default.
--- GANTI hash ini jika sudah run generate_hashes.py
+-- Hash digenerate langsung oleh pgcrypto (crypt + gen_salt)
+-- sehingga PASTI kompatibel dengan fungsi verify_password.
+--
+-- Kredensial default:
+--   admin  → ayom2024
+--   kasir  → kasir123
 INSERT INTO public.users (username, password_hash, full_name, role, is_active)
 VALUES
   (
     'admin',
-    -- bcrypt hash untuk: ayom2024
-    -- Jalankan generate_hashes.py untuk mendapatkan hash yang benar
-    -- lalu replace baris ini
-    '$2b$12$U5kD1i70q28E7oYkupKWMufg.VhQztq0VUyCe8jllx30CEE18lFiS',
+    crypt('ayom2024', gen_salt('bf', 12)),
     'Administrator',
     'admin',
     TRUE
   ),
   (
     'kasir',
-    -- bcrypt hash untuk: kasir123
-    '$2b$12$V8v8pRm/9WCxrK4z7b8xI.pIHjfIvHOr6Fs.9nVt9tGu1kYHTi20S',
+    crypt('kasir123', gen_salt('bf', 12)),
     'Kasir',
     'kasir',
     TRUE
   )
-ON CONFLICT (username) DO NOTHING;
+ON CONFLICT (username) DO UPDATE
+  SET password_hash = EXCLUDED.password_hash;
 
 
 -- ─── Produk Awal Warung ───────────────────────────────────────
