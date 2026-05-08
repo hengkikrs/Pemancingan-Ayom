@@ -2387,9 +2387,10 @@ function WarungTab({ bp }) {
     };
 
     if (SB_READY) {
+      const { users, ...txData } = tx;
       await supabase
         .from("warung_transactions")
-        .insert({ ...tx, created_by: safeUserId(user) });
+        .insert({ ...txData, created_by: safeUserId(user) });
       if (isCig && newStk)
         await supabase
           .from("products")
@@ -3401,6 +3402,8 @@ function LaporanTab({ bp }) {
   const [period, setPeriod] = useState("daily");
   const [loading, setLoading] = useState({ excel: false, pdf: false });
   const [toast, setToast] = useState(null);
+  const [cashMatch, setCashMatch] = useState(true);
+  const [cashNotes, setCashNotes] = useState("");
 
   const endDate =
     period === "weekly"
@@ -3410,13 +3413,18 @@ function LaporanTab({ bp }) {
       : startDate;
 
   const download = async (type) => {
+    if (!cashMatch && !cashNotes.trim()) {
+      setToast({ msg: "Wajib mengisi catatan jika terdapat selisih uang fisik!", type: "error" });
+      return;
+    }
+    
     setLoading((l) => ({ ...l, [type]: true }));
     try {
       const url = `${API_URL}/api/report/${type}?start=${startDate}&period=${period}`;
       const res = await fetch(url);
       if (!res.ok)
         throw new Error(
-          `HTTP ${res.status} — Pastikan backend Python berjalan`,
+          `Gagal memuat laporan (HTTP ${res.status}) — Pastikan API berjalan`,
         );
       const blob = await res.blob();
       const a = document.createElement("a");
@@ -3599,16 +3607,45 @@ function LaporanTab({ bp }) {
         <div
           style={{
             marginTop: 14,
-            padding: "10px 14px",
-            background: "#FFF9F0",
-            border: "1px solid #FED7AA",
+            padding: "14px",
+            background: C.gray50,
+            border: `1px solid ${C.gray200}`,
             borderRadius: 10,
-            fontSize: 12,
-            color: C.gray500,
           }}
         >
-          ⚠️ Export butuh backend Python:{" "}
-          <code>cd backend && uvicorn main:app --reload</code>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, color: C.gray700 }}>
+            <input 
+              type="checkbox" 
+              checked={cashMatch}
+              onChange={(e) => setCashMatch(e.target.checked)}
+              style={{ width: 16, height: 16, accentColor: C.blue }}
+            />
+            ✅ Uang fisik di laci sesuai dengan total pencatatan sistem
+          </label>
+          
+          {!cashMatch && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 11, color: C.rose, fontWeight: 700, marginBottom: 4 }}>
+                ⚠️ Terdapat Selisih! (Wajib diisi)
+              </div>
+              <textarea
+                value={cashNotes}
+                onChange={(e) => setCashNotes(e.target.value)}
+                placeholder="Jelaskan alasan selisih uang (contoh: untuk kembalian kurang 50rb, kasbon belum dibayar, dll)..."
+                style={{
+                  width: "100%",
+                  padding: 10,
+                  borderRadius: 8,
+                  border: `1px solid ${C.rose}`,
+                  background: "#FFF",
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                  resize: "vertical",
+                  minHeight: 60
+                }}
+              />
+            </div>
+          )}
         </div>
       </Card>
     </div>
