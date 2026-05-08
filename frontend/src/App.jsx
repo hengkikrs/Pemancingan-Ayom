@@ -16,6 +16,9 @@ import {
 } from "recharts";
 import { supabase } from "./supabase";
 import { useAuth, AuthProvider } from "./useAuth";
+import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
 
 // ─── Supabase guard ────────────────────────────────────────
 // Kalau credentials belum diisi, pakai local state saja
@@ -1257,12 +1260,14 @@ function StatRing({ pct, color, size = 64, stroke = 7, label, value }) {
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
       <div style={{ position: "relative", width: size, height: size }}>
         <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color+"22"} strokeWidth={stroke} />
-          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color + "22"} strokeWidth={stroke} />
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke}
             strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" style={{ transition: "stroke-dasharray .6s ease" }} />
         </svg>
-        <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center",
-          fontSize: 11, fontWeight: 800, color, fontFamily: "'DM Mono',monospace" }}>{pct}%</div>
+        <div style={{
+          position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 11, fontWeight: 800, color, fontFamily: "'DM Mono',monospace"
+        }}>{pct}%</div>
       </div>
       <div style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", fontWeight: 600, textAlign: "center" }}>{label}</div>
       <div style={{ fontSize: 12, fontWeight: 800, color: C.white, fontFamily: "'DM Mono',monospace" }}>{value}</div>
@@ -1274,20 +1279,30 @@ function RankRow({ rank, name, value, color, max }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : `#${rank}`;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0",
-      borderBottom: `1px solid ${C.gray100}` }}>
-      <span style={{ fontSize: rank <= 3 ? 16 : 12, minWidth: 24, textAlign: "center",
-        fontWeight: 700, color: C.gray500 }}>{medal}</span>
+    <div style={{
+      display: "flex", alignItems: "center", gap: 10, padding: "8px 0",
+      borderBottom: `1px solid ${C.gray100}`
+    }}>
+      <span style={{
+        fontSize: rank <= 3 ? 16 : 12, minWidth: 24, textAlign: "center",
+        fontWeight: 700, color: C.gray500
+      }}>{medal}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: C.gray800, overflow: "hidden",
-          textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name || "—"}</div>
+        <div style={{
+          fontSize: 12, fontWeight: 700, color: C.gray800, overflow: "hidden",
+          textOverflow: "ellipsis", whiteSpace: "nowrap"
+        }}>{name || "—"}</div>
         <div style={{ height: 4, background: C.gray100, borderRadius: 9999, marginTop: 4, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${pct}%`, borderRadius: 9999,
-            background: `linear-gradient(90deg,${color}88,${color})`, transition: "width .5s" }} />
+          <div style={{
+            height: "100%", width: `${pct}%`, borderRadius: 9999,
+            background: `linear-gradient(90deg,${color}88,${color})`, transition: "width .5s"
+          }} />
         </div>
       </div>
-      <div style={{ fontSize: 12, fontWeight: 800, color, fontFamily: "'DM Mono',monospace",
-        whiteSpace: "nowrap" }}>{fmtShort(value)}</div>
+      <div style={{
+        fontSize: 12, fontWeight: 800, color, fontFamily: "'DM Mono',monospace",
+        whiteSpace: "nowrap"
+      }}>{fmtShort(value)}</div>
     </div>
   );
 }
@@ -1298,11 +1313,11 @@ function DashboardTab({ bp }) {
   const { isMobile } = bp;
 
   // ── Computed data ────────────────────────────────────────
-  const galRevTotal = sessions.reduce((a,s) => a + s.participants * TICKET_PRICE, 0);
+  const galRevTotal = sessions.reduce((a, s) => a + s.participants * TICKET_PRICE, 0);
   const galProfTotal = galRevTotal * 0.5;
   const galPrizeTotal = galRevTotal * 0.5;
-  const warRevTotal = txns.reduce((a,t) => a + parseFloat(t.revenue||0), 0);
-  const warProfTotal = txns.reduce((a,t) => a + parseFloat(t.profit||0), 0);
+  const warRevTotal = txns.reduce((a, t) => a + parseFloat(t.revenue || 0), 0);
+  const warProfTotal = txns.reduce((a, t) => a + parseFloat(t.profit || 0), 0);
   const totalOmzet = galRevTotal + warRevTotal;
   const totalProfit = galProfTotal + warProfTotal;
 
@@ -1314,162 +1329,196 @@ function DashboardTab({ bp }) {
   });
   txns.forEach(t => {
     dateMap[t.trans_date] = dateMap[t.trans_date] || { date: t.trans_date.slice(5), gal: 0, war: 0 };
-    dateMap[t.trans_date].war += parseFloat(t.profit||0);
+    dateMap[t.trans_date].war += parseFloat(t.profit || 0);
   });
-  const trend = Object.values(dateMap).sort((a,b) => a.date.localeCompare(b.date)).slice(-10);
+  const trend = Object.values(dateMap).sort((a, b) => a.date.localeCompare(b.date)).slice(-10);
 
   // Category distribution
   const catMap = {};
   txns.forEach(t => {
     catMap[t.category] = catMap[t.category] || { name: t.category, value: 0, profit: 0 };
-    catMap[t.category].value += parseFloat(t.revenue||0);
-    catMap[t.category].profit += parseFloat(t.profit||0);
+    catMap[t.category].value += parseFloat(t.revenue || 0);
+    catMap[t.category].profit += parseFloat(t.profit || 0);
   });
-  const catData = Object.values(catMap).sort((a,b) => b.value - a.value);
+  const catData = Object.values(catMap).sort((a, b) => b.value - a.value);
   const PIE_COLORS = [C.blueL, C.teal, C.amber, C.violet, C.emerald];
 
   // Winners leaderboard from sessions
   const winnerMap = {};
   sessions.forEach(s => {
     const g = calcGal(s.participants);
-    if (s.winner1_name) { winnerMap[s.winner1_name] = (winnerMap[s.winner1_name]||0) + g.j1; }
-    if (s.winner2_name) { winnerMap[s.winner2_name] = (winnerMap[s.winner2_name]||0) + g.j2; }
-    if (s.winner3_name && g.j3) { winnerMap[s.winner3_name] = (winnerMap[s.winner3_name]||0) + g.j3; }
+    if (s.winner1_name) { winnerMap[s.winner1_name] = (winnerMap[s.winner1_name] || 0) + g.j1; }
+    if (s.winner2_name) { winnerMap[s.winner2_name] = (winnerMap[s.winner2_name] || 0) + g.j2; }
+    if (s.winner3_name && g.j3) { winnerMap[s.winner3_name] = (winnerMap[s.winner3_name] || 0) + g.j3; }
   });
-  const topWinners = Object.entries(winnerMap).sort((a,b) => b[1]-a[1]).slice(0,5);
+  const topWinners = Object.entries(winnerMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const maxWin = topWinners[0]?.[1] || 1;
 
   // Occupancy data (last 8 sessions)
-  const recentSessions = [...sessions].slice(0,8);
+  const recentSessions = [...sessions].slice(0, 8);
   const avgPax = recentSessions.length > 0
-    ? Math.round(recentSessions.reduce((a,s) => a+s.participants,0) / recentSessions.length) : 0;
+    ? Math.round(recentSessions.reduce((a, s) => a + s.participants, 0) / recentSessions.length) : 0;
   const occPct = Math.round((avgPax / MAX_ANGLERS) * 100);
-  const warMargin = warRevTotal > 0 ? Math.round((warProfTotal/warRevTotal)*100) : 0;
-  const galEffPct = Math.min(100, Math.round((sessions.length > 0 ? avgPax/MAX_ANGLERS : 0) * 100));
+  const warMargin = warRevTotal > 0 ? Math.round((warProfTotal / warRevTotal) * 100) : 0;
+  const galEffPct = Math.min(100, Math.round((sessions.length > 0 ? avgPax / MAX_ANGLERS : 0) * 100));
 
   const todayStr = today();
   const todayTxns = txns.filter(t => t.trans_date === todayStr);
-  const todayRev = todayTxns.reduce((a,t) => a+parseFloat(t.revenue||0), 0);
+  const todayRev = todayTxns.reduce((a, t) => a + parseFloat(t.revenue || 0), 0);
   const todaySessions = sessions.filter(s => s.session_date === todayStr);
 
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
 
       {/* ── HERO BANNER ─────────────────────────────── */}
       <div style={{
         background: `linear-gradient(135deg,${C.navy} 0%,${C.navyMid} 55%,${C.navyLight} 100%)`,
         borderRadius: 20, padding: isMobile ? "18px 16px" : "22px 28px",
-        color: C.white, position:"relative", overflow:"hidden",
-        boxShadow:"0 8px 32px rgba(11,29,53,0.35)"
+        color: C.white, position: "relative", overflow: "hidden",
+        boxShadow: "0 8px 32px rgba(11,29,53,0.35)"
       }}>
-        <div style={{ position:"absolute", top:-40, right:-40, width:180, height:180, borderRadius:"50%",
-          background:"rgba(255,255,255,0.04)" }} />
-        <div style={{ position:"absolute", bottom:-30, right:60, width:100, height:100, borderRadius:"50%",
-          background:"rgba(66,165,245,0.08)" }} />
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:12 }}>
+        <div style={{
+          position: "absolute", top: -40, right: -40, width: 180, height: 180, borderRadius: "50%",
+          background: "rgba(255,255,255,0.04)"
+        }} />
+        <div style={{
+          position: "absolute", bottom: -30, right: 60, width: 100, height: 100, borderRadius: "50%",
+          background: "rgba(66,165,245,0.08)"
+        }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
           <div>
-            <div style={{ fontSize:11, opacity:.55, fontWeight:700, letterSpacing:"0.1em",
-              textTransform:"uppercase", marginBottom:6 }}>Total Laba Gabungan</div>
-            <div style={{ fontSize: isMobile?28:38, fontWeight:900, fontFamily:"'DM Mono',monospace",
-              letterSpacing:"-2px", lineHeight:1 }}>{fmt(totalProfit)}</div>
-            <div style={{ fontSize:12, opacity:.6, marginTop:8, display:"flex", gap:16, flexWrap:"wrap" }}>
+            <div style={{
+              fontSize: 11, opacity: .55, fontWeight: 700, letterSpacing: "0.1em",
+              textTransform: "uppercase", marginBottom: 6
+            }}>Total Laba Gabungan</div>
+            <div style={{
+              fontSize: isMobile ? 28 : 38, fontWeight: 900, fontFamily: "'DM Mono',monospace",
+              letterSpacing: "-2px", lineHeight: 1
+            }}>{fmt(totalProfit)}</div>
+            <div style={{ fontSize: 12, opacity: .6, marginTop: 8, display: "flex", gap: 16, flexWrap: "wrap" }}>
               <span>🎣 {sessions.length} sesi</span>
               <span>🛒 {txns.length} transaksi</span>
               <span>📅 Hari ini: {todaySessions.length} sesi, {todayTxns.length} transaksi</span>
             </div>
           </div>
           {!isMobile && (
-            <div style={{ display:"flex", gap:24, alignItems:"center" }}>
+            <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
               <StatRing pct={occPct} color={C.sky} label="Rata Okupansi" value={`${avgPax}/${MAX_ANGLERS}`} size={72} stroke={7} />
               <StatRing pct={warMargin} color={C.teal} label="Margin Warung" value={`${warMargin}%`} size={72} stroke={7} />
-              <StatRing pct={Math.min(100,Math.round(totalOmzet/5000000*100))} color={C.amber} label="Target 5jt" value={fmtShort(totalOmzet)} size={72} stroke={7} />
+              <StatRing pct={Math.min(100, Math.round(totalOmzet / 5000000 * 100))} color={C.amber} label="Target 5jt" value={fmtShort(totalOmzet)} size={72} stroke={7} />
             </div>
           )}
         </div>
         {/* Today highlight bar */}
         {(todaySessions.length > 0 || todayTxns.length > 0) && (
-          <div style={{ marginTop:14, padding:"8px 14px", background:"rgba(255,255,255,0.08)",
-            borderRadius:10, display:"flex", gap:20, flexWrap:"wrap" }}>
-            <span style={{ fontSize:11, color:"rgba(255,255,255,0.8)", fontWeight:600 }}>
-              ⚡ Hari ini — Galatama: <b style={{color:C.sky}}>{fmt(todaySessions.reduce((a,s)=>a+s.participants*TICKET_PRICE*0.5,0))}</b>
-              &nbsp;· Warung: <b style={{color:C.teal}}>{fmt(todayRev)}</b>
+          <div style={{
+            marginTop: 14, padding: "8px 14px", background: "rgba(255,255,255,0.08)",
+            borderRadius: 10, display: "flex", gap: 20, flexWrap: "wrap"
+          }}>
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", fontWeight: 600 }}>
+              ⚡ Hari ini — Galatama: <b style={{ color: C.sky }}>{fmt(todaySessions.reduce((a, s) => a + s.participants * TICKET_PRICE * 0.5, 0))}</b>
+              &nbsp;· Warung: <b style={{ color: C.teal }}>{fmt(todayRev)}</b>
             </span>
           </div>
         )}
       </div>
 
       {/* ── 6 KPI CARDS ─────────────────────────────── */}
-      <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr 1fr":"repeat(3,1fr)", gap:12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3,1fr)", gap: 12 }}>
         {[
-          { label:"Omzet Galatama", value:fmtShort(galRevTotal), sub:`${sessions.length} sesi`, color:C.blueL, icon:"🎣",
-            detail: `Tiket ${fmt(TICKET_PRICE)}/orang` },
-          { label:"Profit Kolam", value:fmtShort(galProfTotal), sub:"50% dari omzet", color:C.teal, icon:"💰",
-            detail: `Prize pool: ${fmtShort(galPrizeTotal)}` },
-          { label:"Omzet Warung", value:fmtShort(warRevTotal), sub:`${txns.length} transaksi`, color:C.amber, icon:"🛒",
-            detail: `${catData.length} kategori produk` },
-          { label:"Profit Warung", value:fmtShort(warProfTotal), sub:`Margin ${warMargin}%`, color:C.emerald, icon:"💹",
-            detail: `HPP: ${fmtShort(warRevTotal-warProfTotal)}` },
-          { label:"Total Omzet", value:fmtShort(totalOmzet), sub:"Gabungan", color:C.violet, icon:"📊",
-            detail: `Gal ${Math.round(galRevTotal/Math.max(totalOmzet,1)*100)}% · War ${Math.round(warRevTotal/Math.max(totalOmzet,1)*100)}%` },
-          { label:"Total Profit", value:fmtShort(totalProfit), sub:"Bersih gabungan", color:C.rose, icon:"🏆",
-            detail: `Margin ${totalOmzet>0?Math.round(totalProfit/totalOmzet*100):0}%` },
-        ].map((k,i) => (
-          <div key={i} style={{ background:C.white, borderRadius:16, padding:"14px 16px",
-            border:`1px solid ${C.gray100}`, boxShadow:"0 2px 12px rgba(0,0,0,0.05)",
-            position:"relative", overflow:"hidden", transition:"transform .15s",
-            cursor:"default" }}
-            onMouseEnter={e=>e.currentTarget.style.transform="translateY(-2px)"}
-            onMouseLeave={e=>e.currentTarget.style.transform="translateY(0)"}>
-            <div style={{ position:"absolute", top:-16, right:-16, width:64, height:64, borderRadius:"50%",
-              background:`radial-gradient(circle,${k.color}18,transparent 70%)` }} />
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-              <div style={{ width:36, height:36, borderRadius:10, background:`${k.color}18`,
-                display:"flex", alignItems:"center", justifyContent:"center", fontSize:18,
-                border:`1px solid ${k.color}22` }}>{k.icon}</div>
-              <span style={{ fontSize:9, fontWeight:700, color:k.color, background:`${k.color}15`,
-                padding:"2px 7px", borderRadius:20, letterSpacing:"0.06em",
-                textTransform:"uppercase" }}>LIVE</span>
+          {
+            label: "Omzet Galatama", value: fmtShort(galRevTotal), sub: `${sessions.length} sesi`, color: C.blueL, icon: "🎣",
+            detail: `Tiket ${fmt(TICKET_PRICE)}/orang`
+          },
+          {
+            label: "Profit Kolam", value: fmtShort(galProfTotal), sub: "50% dari omzet", color: C.teal, icon: "💰",
+            detail: `Prize pool: ${fmtShort(galPrizeTotal)}`
+          },
+          {
+            label: "Omzet Warung", value: fmtShort(warRevTotal), sub: `${txns.length} transaksi`, color: C.amber, icon: "🛒",
+            detail: `${catData.length} kategori produk`
+          },
+          {
+            label: "Profit Warung", value: fmtShort(warProfTotal), sub: `Margin ${warMargin}%`, color: C.emerald, icon: "💹",
+            detail: `HPP: ${fmtShort(warRevTotal - warProfTotal)}`
+          },
+          {
+            label: "Total Omzet", value: fmtShort(totalOmzet), sub: "Gabungan", color: C.violet, icon: "📊",
+            detail: `Gal ${Math.round(galRevTotal / Math.max(totalOmzet, 1) * 100)}% · War ${Math.round(warRevTotal / Math.max(totalOmzet, 1) * 100)}%`
+          },
+          {
+            label: "Total Profit", value: fmtShort(totalProfit), sub: "Bersih gabungan", color: C.rose, icon: "🏆",
+            detail: `Margin ${totalOmzet > 0 ? Math.round(totalProfit / totalOmzet * 100) : 0}%`
+          },
+        ].map((k, i) => (
+          <div key={i} style={{
+            background: C.white, borderRadius: 16, padding: "14px 16px",
+            border: `1px solid ${C.gray100}`, boxShadow: "0 2px 12px rgba(0,0,0,0.05)",
+            position: "relative", overflow: "hidden", transition: "transform .15s",
+            cursor: "default"
+          }}
+            onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+            onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
+            <div style={{
+              position: "absolute", top: -16, right: -16, width: 64, height: 64, borderRadius: "50%",
+              background: `radial-gradient(circle,${k.color}18,transparent 70%)`
+            }} />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10, background: `${k.color}18`,
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+                border: `1px solid ${k.color}22`
+              }}>{k.icon}</div>
+              <span style={{
+                fontSize: 9, fontWeight: 700, color: k.color, background: `${k.color}15`,
+                padding: "2px 7px", borderRadius: 20, letterSpacing: "0.06em",
+                textTransform: "uppercase"
+              }}>LIVE</span>
             </div>
-            <div style={{ marginTop:10, fontSize:9, fontWeight:700, letterSpacing:"0.08em",
-              textTransform:"uppercase", color:C.gray400 }}>{k.label}</div>
-            <div style={{ fontSize:isMobile?17:20, fontWeight:900, color:C.gray800,
-              fontFamily:"'DM Mono',monospace", marginTop:2 }}>{k.value}</div>
-            <div style={{ fontSize:10, color:k.color, fontWeight:600, marginTop:2 }}>{k.sub}</div>
-            <div style={{ fontSize:9, color:C.gray400, marginTop:4 }}>{k.detail}</div>
+            <div style={{
+              marginTop: 10, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
+              textTransform: "uppercase", color: C.gray400
+            }}>{k.label}</div>
+            <div style={{
+              fontSize: isMobile ? 17 : 20, fontWeight: 900, color: C.gray800,
+              fontFamily: "'DM Mono',monospace", marginTop: 2
+            }}>{k.value}</div>
+            <div style={{ fontSize: 10, color: k.color, fontWeight: 600, marginTop: 2 }}>{k.sub}</div>
+            <div style={{ fontSize: 9, color: C.gray400, marginTop: 4 }}>{k.detail}</div>
           </div>
         ))}
       </div>
 
       {/* ── CHARTS ROW ──────────────────────────────── */}
-      <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"2fr 1fr", gap:16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr", gap: 16 }}>
 
         {/* Trend Chart */}
         <Card>
           <CardHdr title="📈 Tren Profit Harian" sub="Galatama vs Warung (10 hari terakhir)" />
           {trend.length === 0 ? (
-            <div style={{ textAlign:"center", padding:"48px 0", color:C.gray300, fontSize:13 }}>
-              <div style={{ fontSize:32, marginBottom:8 }}>📊</div>Belum ada data
+            <div style={{ textAlign: "center", padding: "48px 0", color: C.gray300, fontSize: 13 }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>Belum ada data
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={trend} margin={{ top:4, right:4, left:-20, bottom:0 }}>
+              <AreaChart data={trend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="dG" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={C.blueL} stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor={C.blueL} stopOpacity={0}/>
+                    <stop offset="5%" stopColor={C.blueL} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={C.blueL} stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="dW" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={C.amber} stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor={C.amber} stopOpacity={0}/>
+                    <stop offset="5%" stopColor={C.amber} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={C.amber} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={C.gray100} />
-                <XAxis dataKey="date" tick={{ fill:C.gray400, fontSize:10 }} axisLine={false} tickLine={false}/>
-                <YAxis tickFormatter={fmtShort} tick={{ fill:C.gray400, fontSize:9 }} axisLine={false} tickLine={false}/>
-                <Tooltip content={<ChartTip />}/>
-                <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize:11 }}/>
-                <Area type="monotone" dataKey="gal" name="Galatama" stroke={C.blueL} fill="url(#dG)" strokeWidth={2.5} dot={{ fill:C.blueL, r:3 }}/>
-                <Area type="monotone" dataKey="war" name="Warung" stroke={C.amber} fill="url(#dW)" strokeWidth={2.5} dot={{ fill:C.amber, r:3 }}/>
+                <XAxis dataKey="date" tick={{ fill: C.gray400, fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={fmtShort} tick={{ fill: C.gray400, fontSize: 9 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<ChartTip />} />
+                <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11 }} />
+                <Area type="monotone" dataKey="gal" name="Galatama" stroke={C.blueL} fill="url(#dG)" strokeWidth={2.5} dot={{ fill: C.blueL, r: 3 }} />
+                <Area type="monotone" dataKey="war" name="Warung" stroke={C.amber} fill="url(#dW)" strokeWidth={2.5} dot={{ fill: C.amber, r: 3 }} />
               </AreaChart>
             </ResponsiveContainer>
           )}
@@ -1479,8 +1528,8 @@ function DashboardTab({ bp }) {
         <Card>
           <CardHdr title="🛒 Warung per Kategori" sub="Distribusi omzet" />
           {catData.length === 0 ? (
-            <div style={{ textAlign:"center", padding:"48px 0", color:C.gray300 }}>
-              <div style={{ fontSize:32 }}>🛒</div><div style={{ fontSize:12, marginTop:8 }}>Belum ada transaksi</div>
+            <div style={{ textAlign: "center", padding: "48px 0", color: C.gray300 }}>
+              <div style={{ fontSize: 32 }}>🛒</div><div style={{ fontSize: 12, marginTop: 8 }}>Belum ada transaksi</div>
             </div>
           ) : (
             <>
@@ -1488,23 +1537,31 @@ function DashboardTab({ bp }) {
                 <PieChart>
                   <Pie data={catData} cx="50%" cy="50%" innerRadius={38} outerRadius={60}
                     paddingAngle={3} dataKey="value">
-                    {catData.map((_,i) => <Cell key={i} fill={PIE_COLORS[i%PIE_COLORS.length]}/>)}
+                    {catData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                   </Pie>
-                  <Tooltip content={<ChartTip />}/>
+                  <Tooltip content={<ChartTip />} />
                 </PieChart>
               </ResponsiveContainer>
-              <div style={{ display:"flex", flexDirection:"column", gap:5, marginTop:4 }}>
-                {catData.map((d,i) => (
-                  <div key={i} style={{ display:"flex", alignItems:"center", gap:7 }}>
-                    <div style={{ width:8, height:8, borderRadius:"50%", flexShrink:0,
-                      background:PIE_COLORS[i%PIE_COLORS.length] }}/>
-                    <div style={{ flex:1, fontSize:11, color:C.gray600, overflow:"hidden",
-                      textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{d.name}</div>
-                    <div style={{ fontSize:11, fontWeight:800, color:C.gray800,
-                      fontFamily:"'DM Mono',monospace" }}>{fmtShort(d.value)}</div>
-                    <div style={{ fontSize:10, color:C.emerald, fontWeight:600,
-                      minWidth:32, textAlign:"right" }}>
-                      {warRevTotal>0?Math.round(d.value/warRevTotal*100):0}%
+              <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 4 }}>
+                {catData.map((d, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <div style={{
+                      width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                      background: PIE_COLORS[i % PIE_COLORS.length]
+                    }} />
+                    <div style={{
+                      flex: 1, fontSize: 11, color: C.gray600, overflow: "hidden",
+                      textOverflow: "ellipsis", whiteSpace: "nowrap"
+                    }}>{d.name}</div>
+                    <div style={{
+                      fontSize: 11, fontWeight: 800, color: C.gray800,
+                      fontFamily: "'DM Mono',monospace"
+                    }}>{fmtShort(d.value)}</div>
+                    <div style={{
+                      fontSize: 10, color: C.emerald, fontWeight: 600,
+                      minWidth: 32, textAlign: "right"
+                    }}>
+                      {warRevTotal > 0 ? Math.round(d.value / warRevTotal * 100) : 0}%
                     </div>
                   </div>
                 ))}
@@ -1515,21 +1572,21 @@ function DashboardTab({ bp }) {
       </div>
 
       {/* ── BOTTOM ROW ──────────────────────────────── */}
-      <div style={{ display:"grid", gridTemplateColumns: isMobile?"1fr":"1fr 1fr", gap:16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
 
         {/* Winner Leaderboard */}
         <Card>
           <CardHdr title="🏆 Juara Terbanyak Menang" sub={`${topWinners.length} pemancing teratas`} />
           {topWinners.length === 0 ? (
-            <div style={{ textAlign:"center", padding:"32px 0", color:C.gray300 }}>
-              <div style={{ fontSize:32 }}>🏆</div>
-              <div style={{ fontSize:12, marginTop:8 }}>Belum ada data juara</div>
+            <div style={{ textAlign: "center", padding: "32px 0", color: C.gray300 }}>
+              <div style={{ fontSize: 32 }}>🏆</div>
+              <div style={{ fontSize: 12, marginTop: 8 }}>Belum ada data juara</div>
             </div>
           ) : (
             <div>
               {topWinners.map(([name, val], i) => (
-                <RankRow key={name} rank={i+1} name={name} value={val} color={
-                  i===0?C.amber:i===1?C.gray400:i===2?C.rose:C.blueL} max={maxWin} />
+                <RankRow key={name} rank={i + 1} name={name} value={val} color={
+                  i === 0 ? C.amber : i === 1 ? C.gray400 : i === 2 ? C.rose : C.blueL} max={maxWin} />
               ))}
             </div>
           )}
@@ -1539,33 +1596,37 @@ function DashboardTab({ bp }) {
         <Card>
           <CardHdr title="🎣 Sesi Terakhir" sub={`Okupansi rata-rata ${occPct}%`} />
           {recentSessions.length === 0 ? (
-            <div style={{ textAlign:"center", padding:"32px 0", color:C.gray300 }}>
-              <div style={{ fontSize:32 }}>🎣</div>
-              <div style={{ fontSize:12, marginTop:8 }}>Belum ada sesi</div>
+            <div style={{ textAlign: "center", padding: "32px 0", color: C.gray300 }}>
+              <div style={{ fontSize: 32 }}>🎣</div>
+              <div style={{ fontSize: 12, marginTop: 8 }}>Belum ada sesi</div>
             </div>
           ) : (
-            <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               {recentSessions.map(s => {
-                const pct = Math.round(s.participants/MAX_ANGLERS*100);
-                const col = s.participants>=20?C.emerald:s.participants>=14?C.blueL:C.amber;
+                const pct = Math.round(s.participants / MAX_ANGLERS * 100);
+                const col = s.participants >= 20 ? C.emerald : s.participants >= 14 ? C.blueL : C.amber;
                 return (
-                  <div key={s.id} style={{ display:"flex", alignItems:"center", gap:9 }}>
-                    <div style={{ minWidth:60, fontSize:10, fontWeight:700, color:C.gray500 }}>
+                  <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                    <div style={{ minWidth: 60, fontSize: 10, fontWeight: 700, color: C.gray500 }}>
                       {s.session_date.slice(5)} S{s.session_num}
                     </div>
-                    <div style={{ flex:1 }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
-                        <span style={{ fontSize:10, color:C.gray600 }}>{s.participants}/{MAX_ANGLERS} pax</span>
-                        <span style={{ fontSize:10, fontWeight:700, color:col }}>{pct}%</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                        <span style={{ fontSize: 10, color: C.gray600 }}>{s.participants}/{MAX_ANGLERS} pax</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: col }}>{pct}%</span>
                       </div>
-                      <div style={{ height:5, background:C.gray100, borderRadius:9999, overflow:"hidden" }}>
-                        <div style={{ height:"100%", width:`${pct}%`, borderRadius:9999,
-                          background:`linear-gradient(90deg,${col}88,${col})`, transition:"width .4s" }}/>
+                      <div style={{ height: 5, background: C.gray100, borderRadius: 9999, overflow: "hidden" }}>
+                        <div style={{
+                          height: "100%", width: `${pct}%`, borderRadius: 9999,
+                          background: `linear-gradient(90deg,${col}88,${col})`, transition: "width .4s"
+                        }} />
                       </div>
                     </div>
-                    <div style={{ minWidth:52, textAlign:"right", fontSize:10, fontWeight:800,
-                      color:C.gray700, fontFamily:"'DM Mono',monospace" }}>
-                      {fmtShort(s.participants*TICKET_PRICE*0.5)}
+                    <div style={{
+                      minWidth: 52, textAlign: "right", fontSize: 10, fontWeight: 800,
+                      color: C.gray700, fontFamily: "'DM Mono',monospace"
+                    }}>
+                      {fmtShort(s.participants * TICKET_PRICE * 0.5)}
                     </div>
                   </div>
                 );
@@ -1579,31 +1640,31 @@ function DashboardTab({ bp }) {
       <Card>
         <CardHdr title="📊 Galatama — Peserta & Omzet per Hari" sub="7 hari terakhir" />
         {galProfTotal === 0 ? (
-          <div style={{ textAlign:"center", padding:"32px 0", color:C.gray300 }}>
-            <div style={{ fontSize:32 }}>📊</div>
-            <div style={{ fontSize:12, marginTop:8 }}>Belum ada data galatama</div>
+          <div style={{ textAlign: "center", padding: "32px 0", color: C.gray300 }}>
+            <div style={{ fontSize: 32 }}>📊</div>
+            <div style={{ fontSize: 12, marginTop: 8 }}>Belum ada data galatama</div>
           </div>
         ) : (() => {
           const galDailyMap = {};
           sessions.forEach(s => {
-            galDailyMap[s.session_date] = galDailyMap[s.session_date] || { date:s.session_date.slice(5), peserta:0, omzet:0, profit:0 };
+            galDailyMap[s.session_date] = galDailyMap[s.session_date] || { date: s.session_date.slice(5), peserta: 0, omzet: 0, profit: 0 };
             galDailyMap[s.session_date].peserta += s.participants;
-            galDailyMap[s.session_date].omzet += s.participants*TICKET_PRICE;
-            galDailyMap[s.session_date].profit += s.participants*TICKET_PRICE*0.5;
+            galDailyMap[s.session_date].omzet += s.participants * TICKET_PRICE;
+            galDailyMap[s.session_date].profit += s.participants * TICKET_PRICE * 0.5;
           });
-          const gd = Object.values(galDailyMap).sort((a,b)=>a.date.localeCompare(b.date)).slice(-7);
+          const gd = Object.values(galDailyMap).sort((a, b) => a.date.localeCompare(b.date)).slice(-7);
           return (
             <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={gd} margin={{ top:4, right:4, left:-20, bottom:0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={C.gray100} vertical={false}/>
-                <XAxis dataKey="date" tick={{ fill:C.gray400, fontSize:10 }} axisLine={false} tickLine={false}/>
-                <YAxis yAxisId="l" tickFormatter={fmtShort} tick={{ fill:C.gray400, fontSize:9 }} axisLine={false} tickLine={false}/>
-                <YAxis yAxisId="r" orientation="right" tick={{ fill:C.gray400, fontSize:9 }} axisLine={false} tickLine={false}/>
-                <Tooltip content={<ChartTip />}/>
-                <Legend iconSize={7} wrapperStyle={{ fontSize:11 }}/>
-                <Bar yAxisId="l" dataKey="omzet" name="Omzet" fill={C.blueL} radius={[5,5,0,0]}/>
-                <Bar yAxisId="l" dataKey="profit" name="Profit" fill={C.teal} radius={[5,5,0,0]}/>
-                <Bar yAxisId="r" dataKey="peserta" name="Peserta" fill={C.amber+"88"} radius={[5,5,0,0]}/>
+              <BarChart data={gd} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={C.gray100} vertical={false} />
+                <XAxis dataKey="date" tick={{ fill: C.gray400, fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis yAxisId="l" tickFormatter={fmtShort} tick={{ fill: C.gray400, fontSize: 9 }} axisLine={false} tickLine={false} />
+                <YAxis yAxisId="r" orientation="right" tick={{ fill: C.gray400, fontSize: 9 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<ChartTip />} />
+                <Legend iconSize={7} wrapperStyle={{ fontSize: 11 }} />
+                <Bar yAxisId="l" dataKey="omzet" name="Omzet" fill={C.blueL} radius={[5, 5, 0, 0]} />
+                <Bar yAxisId="l" dataKey="profit" name="Profit" fill={C.teal} radius={[5, 5, 0, 0]} />
+                <Bar yAxisId="r" dataKey="peserta" name="Peserta" fill={C.amber + "88"} radius={[5, 5, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           );
@@ -1773,7 +1834,7 @@ function GalForm({ form, update, preview, saving, onSave }) {
   );
 }
 
-function GalSessionList({ sessions, setKasbonModal }) {
+function GalSessionList({ sessions, setKasbonModal, onEditSession, onDeleteSession }) {
   return (
     <Card>
       <CardHdr title="Riwayat Sesi" sub={`${sessions.length} sesi`} />
@@ -1823,8 +1884,42 @@ function GalSessionList({ sessions, setKasbonModal }) {
                     {s.participants}/{MAX_ANGLERS} · {s.users?.full_name || "—"}
                   </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <Badge color={col}>{occ}%</Badge>
+                  <button
+                    onClick={() => onEditSession(s)}
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: 6,
+                      background: C.pale,
+                      border: `1px solid ${C.paleDark}`,
+                      cursor: "pointer",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: C.blue,
+                      fontFamily: "inherit",
+                    }}
+                    title="Edit sesi"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => onDeleteSession(s.id)}
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: 6,
+                      background: "#FFEBEE",
+                      border: "1px solid #FFCDD2",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: C.rose,
+                      fontFamily: "inherit",
+                    }}
+                    title="Hapus sesi"
+                  >
+                    🗑️
+                  </button>
                   <button
                     onClick={() => setKasbonModal(s)}
                     style={{
@@ -1964,6 +2059,16 @@ function GalatamaTab({ bp }) {
   const [form, setForm] = useState(empty);
   const [preview, setPreview] = useState(null);
   const [kasbonModal, setKasbonModal] = useState(null);
+  const [editSessionModal, setEditSessionModal] = useState(null);
+  const [editSessionForm, setEditSessionForm] = useState({
+    date: "",
+    sessionNum: "1",
+    participants: "",
+    winner1: "",
+    winner2: "",
+    winner3: "",
+    notes: "",
+  });
   const [kasbonForm, setKasbonForm] = useState({
     name: "",
     amount: "",
@@ -2078,6 +2183,73 @@ function GalatamaTab({ bp }) {
     setToast({ msg: "Kasbon dilunasi!", type: "success" });
   };
 
+  const openEditSession = (session) => {
+    setEditSessionForm({
+      date: session.session_date,
+      sessionNum: String(session.session_num),
+      participants: String(session.participants),
+      winner1: session.winner1_name || "",
+      winner2: session.winner2_name || "",
+      winner3: session.winner3_name || "",
+      notes: session.notes || "",
+    });
+    setEditSessionModal(session);
+  };
+
+  const saveEditSession = async () => {
+    const p = parseInt(editSessionForm.participants);
+    if (!p || p < 1 || p > MAX_ANGLERS) return;
+    setSaving(true);
+    if (SB_READY) {
+      const { error } = await supabase.from("galatama_sessions").update({
+        session_date: editSessionForm.date,
+        session_num: parseInt(editSessionForm.sessionNum),
+        participants: p,
+        winner1_name: editSessionForm.winner1,
+        winner2_name: editSessionForm.winner2,
+        winner3_name: editSessionForm.winner3,
+        notes: editSessionForm.notes,
+      }).eq("id", editSessionModal.id);
+      setSaving(false);
+      if (error) {
+        setToast({ msg: "Gagal: " + error.message, type: "error" });
+        return;
+      }
+      reloadSessions();
+      logActivity("EDIT_GALATAMA", `Edit sesi ${editSessionForm.sessionNum} dengan ${p} peserta`, user);
+    } else {
+      setSessions((prev) => prev.map(s => s.id === editSessionModal.id ? {
+        ...s,
+        session_date: editSessionForm.date,
+        session_num: parseInt(editSessionForm.sessionNum),
+        participants: p,
+        winner1_name: editSessionForm.winner1,
+        winner2_name: editSessionForm.winner2,
+        winner3_name: editSessionForm.winner3 || null,
+        notes: editSessionForm.notes,
+      } : s));
+      setSaving(false);
+    }
+    setToast({ msg: "Sesi berhasil diperbarui!", type: "success" });
+    setEditSessionModal(null);
+  };
+
+  const deleteSession = async (id) => {
+    if (!confirm("Yakin ingin menghapus sesi ini?")) return;
+    if (SB_READY) {
+      const { error } = await supabase.from("galatama_sessions").delete().eq("id", id);
+      if (error) {
+        setToast({ msg: "Gagal: " + error.message, type: "error" });
+        return;
+      }
+      reloadSessions();
+      logActivity("HAPUS_GALATAMA", `Hapus sesi ID ${id}`, user);
+    } else {
+      setSessions((prev) => prev.filter(s => s.id !== id));
+    }
+    setToast({ msg: "Sesi berhasil dihapus!", type: "success" });
+  };
+
   const totOmzet = sessions.reduce(
     (a, s) => a + s.participants * TICKET_PRICE,
     0,
@@ -2184,12 +2356,16 @@ function GalatamaTab({ bp }) {
               <GalSessionList
                 sessions={sessions}
                 setKasbonModal={setKasbonModal}
+                onEditSession={openEditSession}
+                onDeleteSession={deleteSession}
               />
             </div>
           ) : (
             <GalSessionList
               sessions={sessions}
               setKasbonModal={setKasbonModal}
+              onEditSession={openEditSession}
+              onDeleteSession={deleteSession}
             />
           )}
         </>
@@ -2336,6 +2512,78 @@ function GalatamaTab({ bp }) {
           </Btn>
         </div>
       </Modal>
+
+      <Modal
+        open={!!editSessionModal}
+        onClose={() => setEditSessionModal(null)}
+        title="Edit Sesi Galatama"
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <Field label="Tanggal">
+            <Inp
+              type="date"
+              value={editSessionForm.date}
+              onChange={(e) => setEditSessionForm(f => ({ ...f, date: e.target.value }))}
+            />
+          </Field>
+          <Field label="Nomor Sesi">
+            <Sel
+              value={editSessionForm.sessionNum}
+              onChange={(e) => setEditSessionForm(f => ({ ...f, sessionNum: e.target.value }))}
+            >
+              {[1, 2, 3, 4].map(n => <option key={n} value={n}>Sesi {n}</option>)}
+            </Sel>
+          </Field>
+          <Field label="Jumlah Peserta">
+            <Inp
+              type="number"
+              min={1}
+              max={MAX_ANGLERS}
+              value={editSessionForm.participants}
+              onChange={(e) => {
+                const p = parseInt(e.target.value);
+                setEditSessionForm(f => ({ ...f, participants: e.target.value }));
+              }}
+              placeholder={`1-${MAX_ANGLERS}`}
+            />
+          </Field>
+          <Field label="Juara 1">
+            <Inp
+              type="text"
+              value={editSessionForm.winner1}
+              onChange={(e) => setEditSessionForm(f => ({ ...f, winner1: e.target.value }))}
+              placeholder="Nama pemenang..."
+            />
+          </Field>
+          <Field label="Juara 2">
+            <Inp
+              type="text"
+              value={editSessionForm.winner2}
+              onChange={(e) => setEditSessionForm(f => ({ ...f, winner2: e.target.value }))}
+              placeholder="Nama pemenang..."
+            />
+          </Field>
+          <Field label="Juara 3">
+            <Inp
+              type="text"
+              value={editSessionForm.winner3}
+              onChange={(e) => setEditSessionForm(f => ({ ...f, winner3: e.target.value }))}
+              placeholder="Nama pemenang..."
+            />
+          </Field>
+          <Field label="Catatan">
+            <Textarea
+              value={editSessionForm.notes}
+              onChange={(e) => setEditSessionForm(f => ({ ...f, notes: e.target.value }))}
+              placeholder="Opsional..."
+              style={{ minHeight: 60 }}
+            />
+          </Field>
+          <Btn onClick={saveEditSession} loading={saving} style={{ width: "100%" }}>
+            💾 Simpan Perubahan
+          </Btn>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -2368,6 +2616,12 @@ function WarungTab({ bp }) {
     notes: "",
   });
   const [newProdModal, setNewProdModal] = useState(false);
+  const [editTxnModal, setEditTxnModal] = useState(null);
+  const [editTxnForm, setEditTxnForm] = useState({
+    qty: "",
+    unit: "pcs",
+    notes: "",
+  });
   const [newProd, setNewProd] = useState({
     name: "",
     category: "makanan",
@@ -2381,11 +2635,11 @@ function WarungTab({ bp }) {
   const previewTotal =
     selected && posForm.qty
       ? parseInt(posForm.qty || 0) *
-        (isCig
-          ? posForm.unit === "bungkus"
-            ? selected.harga_jual_bungkus
-            : selected.harga_jual_batang
-          : selected.harga_jual)
+      (isCig
+        ? posForm.unit === "bungkus"
+          ? selected.harga_jual_bungkus
+          : selected.harga_jual_batang
+        : selected.harga_jual)
       : 0;
 
   const handleSell = async () => {
@@ -2472,7 +2726,7 @@ function WarungTab({ bp }) {
           .eq("angler_name", posForm.billName)
           .eq("status", "open")
           .limit(1);
-        
+
         if (exBills && exBills.length > 0) {
           await supabase
             .from("open_bills")
@@ -2508,7 +2762,7 @@ function WarungTab({ bp }) {
         });
       }
     }
-    
+
     if (SB_READY) {
       reloadTxns();
       reloadProducts();
@@ -2642,6 +2896,126 @@ function WarungTab({ bp }) {
       logActivity("HAPUS_PRODUK", `Produk ID ${id}`, user);
     } else setProducts((prev) => prev.filter((p) => p.id !== id));
     setToast({ msg: "Produk dihapus", type: "success" });
+  };
+
+  const openEditTxn = (txn) => {
+    setEditTxnForm({
+      qty: String(txn.qty),
+      unit: txn.unit,
+      notes: txn.notes || "",
+    });
+    setEditTxnModal(txn);
+  };
+
+  const saveEditTxn = async () => {
+    const newQty = parseInt(editTxnForm.qty);
+    if (!newQty || newQty < 1) return;
+    
+    const prod = products.find(p => p.id === editTxnModal.product_id);
+    if (!prod) return;
+    
+    const isCig = prod.is_cigarette;
+    let newRevenue = 0, newCogs = 0;
+    
+    if (isCig) {
+      const r = calcCig(prod, newQty, editTxnForm.unit);
+      if (!r) {
+        setToast({ msg: "Stok tidak cukup!", type: "error" });
+        return;
+      }
+      newRevenue = r.revenue;
+      newCogs = r.cogs;
+    } else {
+      if (prod.stok < newQty) {
+        setToast({ msg: "Stok tidak cukup!", type: "error" });
+        return;
+      }
+      newCogs = newQty * prod.harga_beli;
+      newRevenue = newQty * prod.harga_jual;
+    }
+    
+    const newProfit = newRevenue - newCogs;
+    
+    if (SB_READY) {
+      const { error } = await supabase.from("warung_transactions").update({
+        qty: newQty,
+        unit: editTxnForm.unit,
+        notes: editTxnForm.notes,
+        revenue: newRevenue,
+        cogs: newCogs,
+        profit: newProfit,
+      }).eq("id", editTxnModal.id);
+      
+      if (error) {
+        setToast({ msg: "Gagal: " + error.message, type: "error" });
+        return;
+      }
+      reloadTxns();
+      logActivity("EDIT_TRANSAKSI", `Edit transaksi ${prod.name} qty ${newQty}`, user);
+    } else {
+      setTxns(prev => prev.map(t => t.id === editTxnModal.id ? {
+        ...t,
+        qty: newQty,
+        unit: editTxnForm.unit,
+        notes: editTxnForm.notes,
+        revenue: newRevenue,
+        cogs: newCogs,
+        profit: newProfit,
+      } : t));
+    }
+    
+    setToast({ msg: "Transaksi diperbarui!", type: "success" });
+    setEditTxnModal(null);
+  };
+
+  const deleteTxn = async (id) => {
+    if (!confirm("Yakin ingin menghapus transaksi ini?")) return;
+    
+    const txn = txns.find(t => t.id === id);
+    const prod = products.find(p => p.id === txn?.product_id);
+    
+    if (SB_READY) {
+      const { error } = await supabase.from("warung_transactions").delete().eq("id", id);
+      if (error) {
+        setToast({ msg: "Gagal: " + error.message, type: "error" });
+        return;
+      }
+      if (prod) {
+        if (prod.is_cigarette) {
+          const r = calcCig(prod, txn.qty, txn.unit);
+          if (r) {
+            await supabase.from("products").update({
+              stok_bungkus: r.inv.stok_bungkus,
+              stok_batang: r.inv.stok_batang,
+            }).eq("id", prod.id);
+          }
+        } else {
+          await supabase.from("products").update({
+            stok: prod.stok + txn.qty
+          }).eq("id", prod.id);
+        }
+      }
+      reloadTxns();
+      reloadProducts();
+      logActivity("HAPUS_TRANSAKSI", `Hapus transaksi ID ${id}`, user);
+    } else {
+      setTxns(prev => prev.filter(t => t.id !== id));
+      if (prod) {
+        if (prod.is_cigarette) {
+          setProducts(prev => prev.map(p => p.id === prod.id ? {
+            ...p,
+            stok_bungkus: p.stok_bungkus + txn.qty
+          } : p));
+        } else {
+          setProducts(prev => prev.map(p => p.id === prod.id ? {
+            ...p,
+            stok: p.stok + txn.qty
+          } : p));
+        }
+      }
+    }
+    
+    setToast({ msg: "Transaksi dihapus!", type: "success" });
   };
 
   const totalRev = txns.reduce((a, t) => a + parseFloat(t.revenue || 0), 0);
@@ -3035,25 +3409,57 @@ function WarungTab({ bp }) {
                         · {t.users?.full_name || "—"}
                       </div>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <button
+                        onClick={() => openEditTxn(t)}
                         style={{
-                          fontWeight: 800,
-                          fontSize: 13,
-                          color: C.gray800,
-                          fontFamily: "'DM Mono',monospace",
+                          padding: "4px 6px",
+                          borderRadius: 6,
+                          background: C.pale,
+                          border: `1px solid ${C.paleDark}`,
+                          cursor: "pointer",
+                          fontSize: 10,
+                          fontFamily: "inherit",
                         }}
+                        title="Edit"
                       >
-                        {fmt(t.revenue)}
-                      </div>
-                      <div
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => deleteTxn(t.id)}
                         style={{
-                          fontSize: 11,
-                          color: C.emerald,
-                          fontWeight: 600,
+                          padding: "4px 6px",
+                          borderRadius: 6,
+                          background: "#FFEBEE",
+                          border: "1px solid #FFCDD2",
+                          cursor: "pointer",
+                          fontSize: 10,
+                          fontFamily: "inherit",
                         }}
+                        title="Hapus"
                       >
-                        +{fmt(t.profit)}
+                        🗑️
+                      </button>
+                      <div style={{ textAlign: "right", marginLeft: 4 }}>
+                        <div
+                          style={{
+                            fontWeight: 800,
+                            fontSize: 13,
+                            color: C.gray800,
+                            fontFamily: "'DM Mono',monospace",
+                          }}
+                        >
+                          {fmt(t.revenue)}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: C.emerald,
+                            fontWeight: 600,
+                          }}
+                        >
+                          +{fmt(t.profit)}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -3475,7 +3881,7 @@ function WarungTab({ bp }) {
                   ((parseFloat(newProd.hargaJual) -
                     parseFloat(newProd.hargaBeli)) /
                     parseFloat(newProd.hargaJual)) *
-                    100,
+                  100,
                 )}
                 %
               </strong>
@@ -3483,6 +3889,35 @@ function WarungTab({ bp }) {
           )}
           <Btn onClick={saveNewProd} style={{ width: "100%" }}>
             ➕ Simpan Produk
+          </Btn>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!editTxnModal}
+        onClose={() => setEditTxnModal(null)}
+        title={`Edit Transaksi - ${editTxnModal?.product_name}`}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <Field label="Jumlah">
+            <Inp
+              type="number"
+              min={1}
+              value={editTxnForm.qty}
+              onChange={(e) => setEditTxnForm(f => ({ ...f, qty: e.target.value }))}
+              placeholder="Jumlah..."
+            />
+          </Field>
+          <Field label="Catatan">
+            <Textarea
+              value={editTxnForm.notes}
+              onChange={(e) => setEditTxnForm(f => ({ ...f, notes: e.target.value }))}
+              placeholder="Catatan opsional..."
+              style={{ minHeight: 60 }}
+            />
+          </Field>
+          <Btn onClick={saveEditTxn} style={{ width: "100%" }}>
+            💾 Simpan Perubahan
           </Btn>
         </div>
       </Modal>
@@ -3504,6 +3939,51 @@ function LaporanTab({ bp }) {
   const [loading, setLoading] = useState({ excel: false, pdf: false });
   const [toast, setToast] = useState(null);
   const [cashNotes, setCashNotes] = useState("");
+  const [editValModal, setEditValModal] = useState(null);
+  const [editValForm, setEditValForm] = useState({ notes: "" });
+
+  const openEditVal = (val) => {
+    setEditValForm({ notes: val.notes || "" });
+    setEditValModal(val);
+  };
+
+  const saveEditVal = async () => {
+    if (!editValForm.notes.trim()) {
+      setToast({ msg: "Catatan tidak boleh kosong!", type: "error" });
+      return;
+    }
+    if (SB_READY) {
+      const { error } = await supabase.from("drawer_validations").update({
+        notes: editValForm.notes,
+      }).eq("id", editValModal.id);
+      if (error) {
+        setToast({ msg: "Gagal: " + error.message, type: "error" });
+        return;
+      }
+      reloadVals();
+      logActivity("EDIT_VALIDASI", `Edit catatan laci`, user);
+    } else {
+      setVals(prev => prev.map(v => v.id === editValModal.id ? { ...v, notes: editValForm.notes } : v));
+    }
+    setToast({ msg: "Catatan diperbarui!", type: "success" });
+    setEditValModal(null);
+  };
+
+  const deleteVal = async (id) => {
+    if (!confirm("Yakin ingin menghapus catatan ini?")) return;
+    if (SB_READY) {
+      const { error } = await supabase.from("drawer_validations").delete().eq("id", id);
+      if (error) {
+        setToast({ msg: "Gagal: " + error.message, type: "error" });
+        return;
+      }
+      reloadVals();
+      logActivity("HAPUS_VALIDASI", `Hapus catatan laci ID ${id}`, user);
+    } else {
+      setVals(prev => prev.filter(v => v.id !== id));
+    }
+    setToast({ msg: "Catatan dihapus!", type: "success" });
+  };
 
   const saveValidation = async () => {
     if (!cashNotes.trim()) {
@@ -3548,8 +4028,8 @@ function LaporanTab({ bp }) {
   const endDate =
     period === "weekly"
       ? new Date(new Date(startDate).getTime() + 6 * 86400000)
-          .toISOString()
-          .slice(0, 10)
+        .toISOString()
+        .slice(0, 10)
       : startDate;
 
   const filtS = sessions.filter(
@@ -3563,16 +4043,15 @@ function LaporanTab({ bp }) {
     setLoading((l) => ({ ...l, [type]: true }));
     try {
       if (type === "excel") {
-        const XLSX = await import("xlsx");
         const wb = XLSX.utils.book_new();
-        
+
         const wsData = [
           ["LAPORAN KEUANGAN PEMANCINGAN AYOM"],
           [`Periode: ${startDate} sampai ${endDate}`],
           [],
           ["Tipe Transaksi", "Tanggal", "Deskripsi", "Pendapatan"]
         ];
-        
+
         let total = 0;
         filtS.forEach(s => {
           const val = s.participants * TICKET_PRICE;
@@ -3583,24 +4062,21 @@ function LaporanTab({ bp }) {
           total += parseFloat(t.revenue);
           wsData.push(["Warung", t.trans_date, `${t.qty} ${t.unit} ${t.product_name}`, parseFloat(t.revenue)]);
         });
-        
+
         wsData.push([]);
         wsData.push(["", "", "TOTAL PENDAPATAN KOTOR", total]);
-        
+
         const ws = XLSX.utils.aoa_to_sheet(wsData);
         XLSX.utils.book_append_sheet(wb, ws, "Laporan");
         XLSX.writeFile(wb, `laporan_ayom_${startDate}.xlsx`);
         setToast({ msg: "Laporan Excel berhasil diunduh!", type: "success" });
       } else if (type === "pdf") {
-        const { jsPDF } = await import("jspdf");
-        await import("jspdf-autotable");
-        
         const doc = new jsPDF();
         doc.setFontSize(16);
         doc.text("Laporan Keuangan Pemancingan Ayom", 14, 20);
         doc.setFontSize(11);
         doc.text(`Periode: ${startDate} s/d ${endDate}`, 14, 28);
-        
+
         const tableData = [];
         let total = 0;
         filtS.forEach(s => {
@@ -3612,9 +4088,9 @@ function LaporanTab({ bp }) {
           total += parseFloat(t.revenue);
           tableData.push(["Warung", t.trans_date, `${t.qty} ${t.unit} ${t.product_name}`, fmt(parseFloat(t.revenue))]);
         });
-        
+
         tableData.push(["", "", "TOTAL PENDAPATAN", fmt(total)]);
-        
+
         doc.autoTable({
           startY: 34,
           head: [["Tipe", "Tanggal", "Deskripsi", "Pendapatan"]],
@@ -3623,12 +4099,13 @@ function LaporanTab({ bp }) {
           headStyles: { fillColor: [21, 101, 192] },
           footStyles: { fillColor: [255, 255, 255] }
         });
-        
+
         doc.save(`laporan_ayom_${startDate}.pdf`);
         setToast({ msg: "Laporan PDF berhasil diunduh!", type: "success" });
       }
     } catch (e) {
-      setToast({ msg: "Gagal memuat modul PDF/Excel. Pastikan Anda sudah menjalankan 'npm install xlsx jspdf jspdf-autotable'", type: "error" });
+      console.error("Download error:", e);
+      setToast({ msg: "Gagal mengunduh laporan: " + e.message, type: "error" });
     }
     setLoading((l) => ({ ...l, [type]: false }));
   };
@@ -3802,9 +4279,9 @@ function LaporanTab({ bp }) {
           <div style={{ fontSize: 14, fontWeight: 700, color: C.gray800, marginBottom: 12 }}>
             📝 Catatan Laci & Validasi Uang
           </div>
-          
+
           <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-            <Inp 
+            <Inp
               value={cashNotes}
               onChange={(e) => setCashNotes(e.target.value)}
               placeholder="Catat selisih uang, titipan, atau pesan kasir..."
@@ -3830,12 +4307,54 @@ function LaporanTab({ bp }) {
                       <div style={{ fontSize: 13, color: C.gray800, fontWeight: 500 }}>{v.notes}</div>
                       <div style={{ fontSize: 10, color: C.gray400, marginTop: 4 }}>Oleh: {v.users?.full_name || "Admin"}</div>
                     </div>
-                    {!v.is_resolved && (
-                      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: C.emerald, cursor: "pointer", padding: "6px 10px", background: C.white, border: `1px solid ${C.emerald}`, borderRadius: 8 }}>
-                        <input type="checkbox" onChange={() => resolveValidation(v.id)} style={{ accentColor: C.emerald }} />
-                        Selesai
-                      </label>
-                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <button
+                        onClick={() => openEditVal(v)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 6,
+                          background: C.pale,
+                          border: `1px solid ${C.paleDark}`,
+                          cursor: "pointer",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: C.blue,
+                          fontFamily: "inherit",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                        title="Edit"
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button
+                        onClick={() => deleteVal(v.id)}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 6,
+                          background: "#FFEBEE",
+                          border: "1px solid #FFCDD2",
+                          cursor: "pointer",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: C.rose,
+                          fontFamily: "inherit",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                        title="Hapus"
+                      >
+                        🗑️ Hapus
+                      </button>
+                      {!v.is_resolved && (
+                        <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: C.emerald, cursor: "pointer", padding: "6px 10px", background: C.white, border: `1px solid ${C.emerald}`, borderRadius: 8 }}>
+                          <input type="checkbox" onChange={() => resolveValidation(v.id)} style={{ accentColor: C.emerald }} />
+                          Selesai
+                        </label>
+                      )}
+                    </div>
                   </div>
                 );
               })
@@ -3882,6 +4401,26 @@ function LaporanTab({ bp }) {
             )}
           </div>
         </div>
+
+        <Modal
+          open={!!editValModal}
+          onClose={() => setEditValModal(null)}
+          title="Edit Catatan Validasi"
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <Field label="Catatan">
+              <Textarea
+                value={editValForm.notes}
+                onChange={(e) => setEditValForm(f => ({ ...f, notes: e.target.value }))}
+                placeholder="Catatan selisih uang, titipan, atau pesan kasir..."
+                style={{ minHeight: 80 }}
+              />
+            </Field>
+            <Btn onClick={saveEditVal} style={{ width: "100%" }}>
+              💾 Simpan Perubahan
+            </Btn>
+          </div>
+        </Modal>
       </Card>
     </div>
   );

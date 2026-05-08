@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    include: ['xlsx', 'jspdf', 'jspdf-autotable']
+  },
   server: {
     proxy: {
       '/api': {
