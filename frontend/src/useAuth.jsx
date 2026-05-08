@@ -11,22 +11,29 @@ const AuthCtx = createContext(null);
 
 // Demo users (fallback jika Supabase belum disetup)
 const DEMO_USERS = {
-  admin: {
-    id: "demo-admin",
-    username: "admin",
-    full_name: "Administrator",
+  inay: {
+    id: "demo-inay",
+    username: "inay",
+    full_name: "Inay",
     role: "admin",
     is_active: true,
   },
-  kasir: {
-    id: "demo-kasir",
-    username: "kasir",
-    full_name: "Kasir",
+  wembi: {
+    id: "demo-wembi",
+    username: "wembi",
+    full_name: "Wembi",
+    role: "kasir",
+    is_active: true,
+  },
+  gun: {
+    id: "demo-gun",
+    username: "gun",
+    full_name: "Gun",
     role: "kasir",
     is_active: true,
   },
 };
-const DEMO_PASSWORDS = { admin: "ayom2024", kasir: "kasir123" };
+const DEMO_PASSWORDS = { inay: "ayom2024", wembi: "wembi", gun: "gun" };
 
 async function verifyLogin(username, password) {
   // 1. Coba Supabase dulu
