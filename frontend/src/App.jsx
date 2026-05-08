@@ -990,9 +990,6 @@ function LoginPage() {
               🔑 Masuk
             </Btn>
           </form>
-          <div
-            style={{
-              
         </Card>
       </div>
     </div>
