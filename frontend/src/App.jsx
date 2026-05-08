@@ -812,6 +812,23 @@ function useGalKasbon() {
   return { kasbon, setKasbon, reload: load };
 }
 
+function useValidations() {
+  const [vals, setVals] = useState([]);
+  const load = useCallback(async () => {
+    if (!SB_READY) return;
+    const { data } = await supabase
+      .from("drawer_validations")
+      .select("*,users(full_name)")
+      .order("val_date", { ascending: false })
+      .order("created_at", { ascending: false });
+    if (data) setVals(data);
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+  return { vals, setVals, reload: load };
+}
+
 // ─────────────────────────────────────────────────────────
 // LOGIN
 // ─────────────────────────────────────────────────────────
@@ -2310,6 +2327,7 @@ function WarungTab({ bp }) {
     qty: "",
     unit: "pcs",
     billName: "",
+    notes: "",
   });
   const [billMode, setBillMode] = useState("cash");
   const [saving, setSaving] = useState(false);
@@ -2384,6 +2402,8 @@ function WarungTab({ bp }) {
       profit: revenue - cogs,
       payment_type: billMode,
       kasbon_name: posForm.billName || null,
+      customer_name: posForm.billName || null,
+      notes: posForm.notes || null,
       is_settled: billMode === "cash",
       users: { full_name: user?.full_name || "Admin" },
     };
@@ -2469,7 +2489,7 @@ function WarungTab({ bp }) {
 
     setSaving(false);
     setToast({ msg: "Transaksi berhasil!", type: "success" });
-    setPosForm({ productId: "", qty: "", unit: "pcs", billName: "" });
+    setPosForm({ productId: "", qty: "", unit: "pcs", billName: "", notes: "" });
   };
 
   const settleBill = async (bill) => {
@@ -2863,18 +2883,26 @@ function WarungTab({ bp }) {
                   ))}
                 </div>
               </Field>
-              {billMode === "kasbon" && (
-                <Field label="Nama Pemancing">
-                  <Inp
-                    type="text"
-                    value={posForm.billName}
-                    onChange={(e) =>
-                      setPosForm((p) => ({ ...p, billName: e.target.value }))
-                    }
-                    placeholder="Nama..."
-                  />
-                </Field>
-              )}
+              <Field label={`Nama Pelanggan ${billMode === "kasbon" ? "(Wajib)" : "(Opsional)"}`}>
+                <Inp
+                  type="text"
+                  value={posForm.billName}
+                  onChange={(e) =>
+                    setPosForm((p) => ({ ...p, billName: e.target.value }))
+                  }
+                  placeholder="Nama..."
+                />
+              </Field>
+              <Field label="Catatan (Opsional)">
+                <Textarea
+                  value={posForm.notes}
+                  onChange={(e) =>
+                    setPosForm((p) => ({ ...p, notes: e.target.value }))
+                  }
+                  placeholder="Catatan tambahan..."
+                  style={{ minHeight: 50 }}
+                />
+              </Field>
               {previewTotal > 0 && (
                 <div
                   style={{
@@ -3433,14 +3461,49 @@ function WarungTab({ bp }) {
 // LAPORAN
 // ─────────────────────────────────────────────────────────
 function LaporanTab({ bp }) {
+  const { user } = useAuth();
   const { sessions } = useSessions();
   const { txns } = useTransactions();
+  const { vals, setVals, reload: reloadVals } = useValidations();
   const [startDate, setStartDate] = useState(today());
   const [period, setPeriod] = useState("daily");
   const [loading, setLoading] = useState({ excel: false, pdf: false });
   const [toast, setToast] = useState(null);
-  const [cashMatch, setCashMatch] = useState(true);
   const [cashNotes, setCashNotes] = useState("");
+
+  const saveValidation = async () => {
+    if (!cashNotes.trim()) {
+      setToast({ msg: "Wajib mengisi catatan laporan/uang fisik!", type: "error" });
+      return;
+    }
+    const val = {
+      id: Date.now().toString(),
+      val_date: today(),
+      notes: cashNotes,
+      is_resolved: false,
+      users: { full_name: user?.full_name || "Admin" },
+    };
+    if (SB_READY) {
+      const { users, id, ...dbVal } = val;
+      const { error } = await supabase.from("drawer_validations").insert({ ...dbVal, created_by: safeUserId(user) });
+      if (error) setToast({ msg: error.message, type: "error" });
+      else reloadVals();
+    } else {
+      setVals(prev => [val, ...prev]);
+    }
+    setCashNotes("");
+    setToast({ msg: "Laporan catatan berhasil disimpan!", type: "success" });
+  };
+
+  const resolveValidation = async (id) => {
+    if (SB_READY) {
+      await supabase.from("drawer_validations").update({ is_resolved: true }).eq("id", id);
+      reloadVals();
+    } else {
+      setVals(prev => prev.map(v => v.id === id ? { ...v, is_resolved: true } : v));
+    }
+    setToast({ msg: "Status catatan diperbarui (Ketemu/Selesai)!", type: "success" });
+  };
 
   const endDate =
     period === "weekly"
@@ -3450,8 +3513,8 @@ function LaporanTab({ bp }) {
       : startDate;
 
   const download = async (type) => {
-    if (!cashMatch && !cashNotes.trim()) {
-      setToast({ msg: "Wajib mengisi catatan jika terdapat selisih uang fisik!", type: "error" });
+    if (!API_URL) {
+      setToast({ msg: "Laporan PDF/Excel membutuhkan Backend Python yang sedang dinonaktifkan di Vercel. Silakan deploy backend ke platform lain (seperti Railway) dan isi VITE_API_URL.", type: "error" });
       return;
     }
     
@@ -3644,45 +3707,50 @@ function LaporanTab({ bp }) {
         <div
           style={{
             marginTop: 14,
-            padding: "14px",
-            background: C.gray50,
+            padding: "16px",
+            background: C.white,
             border: `1px solid ${C.gray200}`,
-            borderRadius: 10,
+            borderRadius: 12,
+            boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
           }}
         >
-          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, fontWeight: 600, color: C.gray700 }}>
-            <input 
-              type="checkbox" 
-              checked={cashMatch}
-              onChange={(e) => setCashMatch(e.target.checked)}
-              style={{ width: 16, height: 16, accentColor: C.blue }}
-            />
-            ✅ Uang fisik di laci sesuai dengan total pencatatan sistem
-          </label>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.gray800, marginBottom: 12 }}>
+            📝 Catatan Laci & Validasi Uang
+          </div>
           
-          {!cashMatch && (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontSize: 11, color: C.rose, fontWeight: 700, marginBottom: 4 }}>
-                ⚠️ Terdapat Selisih! (Wajib diisi)
-              </div>
-              <textarea
-                value={cashNotes}
-                onChange={(e) => setCashNotes(e.target.value)}
-                placeholder="Jelaskan alasan selisih uang (contoh: untuk kembalian kurang 50rb, kasbon belum dibayar, dll)..."
-                style={{
-                  width: "100%",
-                  padding: 10,
-                  borderRadius: 8,
-                  border: `1px solid ${C.rose}`,
-                  background: "#FFF",
-                  fontFamily: "inherit",
-                  fontSize: 13,
-                  resize: "vertical",
-                  minHeight: 60
-                }}
-              />
-            </div>
-          )}
+          <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+            <Inp 
+              value={cashNotes}
+              onChange={(e) => setCashNotes(e.target.value)}
+              placeholder="Catat selisih uang, titipan, atau pesan kasir..."
+              style={{ flex: 1 }}
+            />
+            <Btn onClick={saveValidation} variant="primary">Kirim</Btn>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 240, overflowY: "auto" }}>
+            {vals.length === 0 ? (
+              <div style={{ fontSize: 12, color: C.gray400, textAlign: "center", padding: "20px 0" }}>Belum ada catatan validasi</div>
+            ) : (
+              vals.map(v => (
+                <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", background: v.is_resolved ? C.gray50 : "#FFF9F0", border: `1px solid ${v.is_resolved ? C.gray200 : "#FED7AA"}`, borderRadius: 10 }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: C.gray500 }}>{v.val_date}</span>
+                      <Badge color={v.is_resolved ? C.emerald : C.amber}>{v.is_resolved ? "✅ Ketemu" : "⏳ Selip"}</Badge>
+                    </div>
+                    <div style={{ fontSize: 13, color: C.gray800, fontWeight: 500 }}>{v.notes}</div>
+                    <div style={{ fontSize: 10, color: C.gray400, marginTop: 4 }}>Oleh: {v.users?.full_name || "Admin"}</div>
+                  </div>
+                  {!v.is_resolved && (
+                    <button onClick={() => resolveValidation(v.id)} style={{ padding: "6px 10px", background: C.white, border: `1px solid ${C.emerald}`, borderRadius: 8, color: C.emerald, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                      Tandai Ketemu
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </Card>
     </div>

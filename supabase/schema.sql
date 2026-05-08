@@ -129,6 +129,8 @@ CREATE TABLE IF NOT EXISTS public.warung_transactions (
   payment_type    TEXT NOT NULL DEFAULT 'cash'
                   CHECK (payment_type IN ('cash', 'kasbon')),
   kasbon_name     TEXT,                            -- diisi jika payment_type='kasbon'
+  customer_name   TEXT,                            -- opsional untuk nama pelanggan cash
+  notes           TEXT,                            -- opsional untuk catatan transaksi
   is_settled      BOOLEAN NOT NULL DEFAULT TRUE,
   created_by      UUID REFERENCES public.users (id) ON DELETE SET NULL,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -157,6 +159,23 @@ CREATE TABLE IF NOT EXISTS public.open_bills (
 
 CREATE INDEX IF NOT EXISTS idx_open_bills_status ON public.open_bills (status);
 CREATE INDEX IF NOT EXISTS idx_open_bills_name   ON public.open_bills (angler_name);
+
+
+-- =============================================================
+-- TABLE: drawer_validations
+-- Menyimpan riwayat validasi laci kasir (uang selip)
+-- =============================================================
+CREATE TABLE IF NOT EXISTS public.drawer_validations (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  val_date        DATE NOT NULL DEFAULT CURRENT_DATE,
+  notes           TEXT NOT NULL,
+  is_resolved     BOOLEAN NOT NULL DEFAULT FALSE,
+  created_by      UUID REFERENCES public.users (id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_drawer_val_date ON public.drawer_validations (val_date DESC);
+CREATE INDEX IF NOT EXISTS idx_drawer_val_resolved ON public.drawer_validations (is_resolved);
 
 
 -- =============================================================
