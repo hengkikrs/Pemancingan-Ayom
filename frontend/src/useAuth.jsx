@@ -28,6 +28,8 @@ const DEMO_USERS = {
 };
 const DEMO_PASSWORDS = { admin: "ayom2024", kasir: "kasir123" };
 
+const API_URL = import.meta.env.VITE_API_URL || "";
+
 async function verifyLogin(username, password) {
   // 1. Coba Supabase dulu
   try {
@@ -43,7 +45,7 @@ async function verifyLogin(username, password) {
       // Coba verifikasi via backend
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/auth/verify`,
+          `${API_URL}/api/auth/verify`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -54,6 +56,7 @@ async function verifyLogin(username, password) {
           const json = await res.json();
           return json.valid ? user : null;
         }
+        throw new Error("Backend response not ok");
       } catch {
         // Backend tidak jalan — cek demo password
         if (DEMO_PASSWORDS[username] === password) return user;

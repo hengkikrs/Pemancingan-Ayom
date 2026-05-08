@@ -3,5 +3,6 @@ uvicorn
 python-dotenv
 pydantic
 supabase
+bcrypt
 openpyxl
 reportlab

@@ -83,7 +83,7 @@ const C = {
 const TICKET_PRICE = 10000;
 const MAX_ANGLERS = 24;
 const LOW_STOCK = 5;
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_URL = import.meta.env.VITE_API_URL || "";
 
 const fmt = (n) =>
   new Intl.NumberFormat("id-ID", {
