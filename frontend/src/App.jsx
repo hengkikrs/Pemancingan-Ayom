@@ -3937,6 +3937,7 @@ function LaporanTab({ bp }) {
   const [startDate, setStartDate] = useState(today());
   const [period, setPeriod] = useState("daily");
   const [loading, setLoading] = useState({ excel: false, pdf: false });
+  const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const [cashNotes, setCashNotes] = useState("");
   const [editValModal, setEditValModal] = useState(null);
@@ -3952,37 +3953,59 @@ function LaporanTab({ bp }) {
       setToast({ msg: "Catatan tidak boleh kosong!", type: "error" });
       return;
     }
-    if (SB_READY) {
-      const { error } = await supabase.from("drawer_validations").update({
-        notes: editValForm.notes,
-      }).eq("id", editValModal.id);
-      if (error) {
-        setToast({ msg: "Gagal: " + error.message, type: "error" });
-        return;
+    setSaving(true);
+    try {
+      if (SB_READY) {
+        const { error } = await supabase.from("drawer_validations").update({
+          notes: editValForm.notes,
+        }).eq("id", editValModal.id);
+        if (error) {
+          console.error("Edit Error:", error);
+          setToast({ msg: "Gagal: " + error.message, type: "error" });
+          setSaving(false);
+          return;
+        }
+        reloadVals();
+        logActivity("EDIT_VALIDASI", `Edit catatan laci`, user);
+      } else {
+        // Local mode
+        setVals(prev => prev.map(v => v.id === editValModal.id ? { ...v, notes: editValForm.notes } : v));
       }
-      reloadVals();
-      logActivity("EDIT_VALIDASI", `Edit catatan laci`, user);
-    } else {
-      setVals(prev => prev.map(v => v.id === editValModal.id ? { ...v, notes: editValForm.notes } : v));
+      setSaving(false);
+      setToast({ msg: "Catatan diperbarui!", type: "success" });
+      setEditValModal(null);
+    } catch (err) {
+      console.error("Error:", err);
+      setSaving(false);
+      setToast({ msg: "Terjadi kesalahan: " + err.message, type: "error" });
     }
-    setToast({ msg: "Catatan diperbarui!", type: "success" });
-    setEditValModal(null);
   };
 
   const deleteVal = async (id) => {
     if (!confirm("Yakin ingin menghapus catatan ini?")) return;
-    if (SB_READY) {
-      const { error } = await supabase.from("drawer_validations").delete().eq("id", id);
-      if (error) {
-        setToast({ msg: "Gagal: " + error.message, type: "error" });
-        return;
+    setSaving(true);
+    try {
+      if (SB_READY) {
+        const { error } = await supabase.from("drawer_validations").delete().eq("id", id);
+        if (error) {
+          console.error("Delete Error:", error);
+          setToast({ msg: "Gagal: " + error.message, type: "error" });
+          setSaving(false);
+          return;
+        }
+        reloadVals();
+        logActivity("HAPUS_VALIDASI", `Hapus catatan laci ID ${id}`, user);
+      } else {
+        // Local mode
+        setVals(prev => prev.filter(v => v.id !== id));
       }
-      reloadVals();
-      logActivity("HAPUS_VALIDASI", `Hapus catatan laci ID ${id}`, user);
-    } else {
-      setVals(prev => prev.filter(v => v.id !== id));
+      setSaving(false);
+      setToast({ msg: "Catatan dihapus!", type: "success" });
+    } catch (err) {
+      console.error("Error:", err);
+      setSaving(false);
+      setToast({ msg: "Terjadi kesalahan: " + err.message, type: "error" });
     }
-    setToast({ msg: "Catatan dihapus!", type: "success" });
   };
 
   const saveValidation = async () => {
