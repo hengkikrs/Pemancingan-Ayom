@@ -179,6 +179,21 @@ CREATE INDEX IF NOT EXISTS idx_drawer_val_resolved ON public.drawer_validations 
 
 
 -- =============================================================
+-- TABLE: activity_logs
+-- Menyimpan log aktivitas (login, tambah, hapus)
+-- =============================================================
+CREATE TABLE IF NOT EXISTS public.activity_logs (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  action_type     TEXT NOT NULL,
+  details         TEXT,
+  created_by      UUID REFERENCES public.users (id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_logs_date ON public.activity_logs (created_at DESC);
+
+
+-- =============================================================
 -- TABLE: stock_adjustments
 -- Log penyesuaian stok manual (hilang, rusak, restock)
 -- =============================================================

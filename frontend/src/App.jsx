@@ -50,6 +50,15 @@ async function sbUpdate(table, data, match) {
   return await q;
 }
 
+async function logActivity(action_type, details, user) {
+  if (!SB_READY) return;
+  await supabase.from("activity_logs").insert({
+    action_type,
+    details,
+    created_by: safeUserId(user)
+  });
+}
+
 // ─────────────────────────────────────────────────────────
 // DESIGN TOKENS
 // ─────────────────────────────────────────────────────────
@@ -827,6 +836,23 @@ function useValidations() {
     load();
   }, [load]);
   return { vals, setVals, reload: load };
+}
+
+function useActivityLogs() {
+  const [logs, setLogs] = useState([]);
+  const load = useCallback(async () => {
+    if (!SB_READY) return;
+    const { data } = await supabase
+      .from("activity_logs")
+      .select("*,users(full_name)")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (data) setLogs(data);
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+  return { logs, reload: load };
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1974,6 +2000,7 @@ function GalatamaTab({ bp }) {
         return;
       }
       reloadSessions(); // Segera reload data setelah insert
+      logActivity("TAMBAH_GALATAMA", `Sesi ${form.sessionNum} dengan ${p} peserta`, user);
     } else {
       // Demo mode: simpan ke local state
       setSessions((prev) => [
@@ -2013,6 +2040,7 @@ function GalatamaTab({ bp }) {
         return;
       }
       reloadKasbon(); // Segera reload data setelah insert
+      logActivity("KASBON_GALATAMA", `Kasbon ${kasbonForm.name} senilai ${fmt(parseFloat(kasbonForm.amount))}`, user);
     } else {
       setKasbon((prev) => [
         {
@@ -2485,6 +2513,7 @@ function WarungTab({ bp }) {
       reloadTxns();
       reloadProducts();
       if (billMode === "kasbon") reloadBills();
+      logActivity("POS_WARUNG", `${qty} ${posForm.unit} ${selected.name} (${billMode})`, user);
     }
 
     setSaving(false);
@@ -2503,6 +2532,7 @@ function WarungTab({ bp }) {
         })
         .eq("id", bill.id);
       reloadBills();
+      logActivity("PELUNASAN", `Kasbon ${bill.angler_name} dilunasi`, user);
     } else {
       setBills((prev) => prev.filter((b) => b.id !== bill.id));
     }
@@ -2552,6 +2582,7 @@ function WarungTab({ bp }) {
             : { stok: after };
       await supabase.from("products").update(upd).eq("id", p.id);
       reloadProducts();
+      logActivity("ADJUST_STOK", `${p.name} qty ${change} (${adjForm.type})`, user);
     } else {
       setProducts((prev) =>
         prev.map((prod) => {
@@ -2588,6 +2619,7 @@ function WarungTab({ bp }) {
         return;
       }
       reloadProducts();
+      logActivity("TAMBAH_PRODUK", `${newProd.name}`, user);
     } else {
       setProducts((prev) => [...prev, { ...prod, id: Date.now().toString() }]);
     }
@@ -2607,6 +2639,7 @@ function WarungTab({ bp }) {
     if (SB_READY) {
       await supabase.from("products").update({ is_active: false }).eq("id", id);
       reloadProducts();
+      logActivity("HAPUS_PRODUK", `Produk ID ${id}`, user);
     } else setProducts((prev) => prev.filter((p) => p.id !== id));
     setToast({ msg: "Produk dihapus", type: "success" });
   };
@@ -3465,6 +3498,7 @@ function LaporanTab({ bp }) {
   const { sessions } = useSessions();
   const { txns } = useTransactions();
   const { vals, setVals, reload: reloadVals } = useValidations();
+  const { logs, reload: reloadLogs } = useActivityLogs();
   const [startDate, setStartDate] = useState(today());
   const [period, setPeriod] = useState("daily");
   const [loading, setLoading] = useState({ excel: false, pdf: false });
@@ -3487,7 +3521,11 @@ function LaporanTab({ bp }) {
       const { users, id, ...dbVal } = val;
       const { error } = await supabase.from("drawer_validations").insert({ ...dbVal, created_by: safeUserId(user) });
       if (error) setToast({ msg: error.message, type: "error" });
-      else reloadVals();
+      else {
+        reloadVals();
+        logActivity("CATAT_LACI", cashNotes, user);
+        reloadLogs();
+      }
     } else {
       setVals(prev => [val, ...prev]);
     }
@@ -3499,6 +3537,8 @@ function LaporanTab({ bp }) {
     if (SB_READY) {
       await supabase.from("drawer_validations").update({ is_resolved: true }).eq("id", id);
       reloadVals();
+      logActivity("RESOLVE_LACI", `Tandai ketemu catatan laci`, user);
+      reloadLogs();
     } else {
       setVals(prev => prev.map(v => v.id === id ? { ...v, is_resolved: true } : v));
     }
@@ -3732,23 +3772,68 @@ function LaporanTab({ bp }) {
             {vals.length === 0 ? (
               <div style={{ fontSize: 12, color: C.gray400, textAlign: "center", padding: "20px 0" }}>Belum ada catatan validasi</div>
             ) : (
-              vals.map(v => (
-                <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", background: v.is_resolved ? C.gray50 : "#FFF9F0", border: `1px solid ${v.is_resolved ? C.gray200 : "#FED7AA"}`, borderRadius: 10 }}>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: C.gray500 }}>{v.val_date}</span>
-                      <Badge color={v.is_resolved ? C.emerald : C.amber}>{v.is_resolved ? "✅ Ketemu" : "⏳ Selip"}</Badge>
+              vals.map(v => {
+                const d = new Date(v.created_at || v.val_date);
+                const timeStr = d.toLocaleDateString("id-ID", { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+                return (
+                  <div key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", background: v.is_resolved ? C.gray50 : "#FFF9F0", border: `1px solid ${v.is_resolved ? C.gray200 : "#FED7AA"}`, borderRadius: 10 }}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: C.gray500 }}>{timeStr}</span>
+                        <Badge color={v.is_resolved ? C.emerald : C.amber}>{v.is_resolved ? "✅ Ketemu" : "⏳ Selip"}</Badge>
+                      </div>
+                      <div style={{ fontSize: 13, color: C.gray800, fontWeight: 500 }}>{v.notes}</div>
+                      <div style={{ fontSize: 10, color: C.gray400, marginTop: 4 }}>Oleh: {v.users?.full_name || "Admin"}</div>
                     </div>
-                    <div style={{ fontSize: 13, color: C.gray800, fontWeight: 500 }}>{v.notes}</div>
-                    <div style={{ fontSize: 10, color: C.gray400, marginTop: 4 }}>Oleh: {v.users?.full_name || "Admin"}</div>
+                    {!v.is_resolved && (
+                      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: C.emerald, cursor: "pointer", padding: "6px 10px", background: C.white, border: `1px solid ${C.emerald}`, borderRadius: 8 }}>
+                        <input type="checkbox" onChange={() => resolveValidation(v.id)} style={{ accentColor: C.emerald }} />
+                        Selesai
+                      </label>
+                    )}
                   </div>
-                  {!v.is_resolved && (
-                    <button onClick={() => resolveValidation(v.id)} style={{ padding: "6px 10px", background: C.white, border: `1px solid ${C.emerald}`, borderRadius: 8, color: C.emerald, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-                      Tandai Ketemu
-                    </button>
-                  )}
-                </div>
-              ))
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* LOG AKTIVITAS */}
+        <div
+          style={{
+            marginTop: 14,
+            padding: "16px",
+            background: C.white,
+            border: `1px solid ${C.gray200}`,
+            borderRadius: 12,
+            boxShadow: "0 2px 10px rgba(0,0,0,0.03)",
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.gray800, marginBottom: 12 }}>
+            ⏱️ Log Aktivitas Sistem
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 300, overflowY: "auto" }}>
+            {logs.length === 0 ? (
+              <div style={{ fontSize: 12, color: C.gray400, textAlign: "center", padding: "20px 0" }}>Belum ada aktivitas terekam</div>
+            ) : (
+              logs.map(lg => {
+                const d = new Date(lg.created_at);
+                return (
+                  <div key={lg.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "10px 12px", background: C.gray50, borderRadius: 8 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.blue, marginTop: 6, flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: C.gray800 }}>{lg.action_type.replace(/_/g, " ")}</div>
+                        <div style={{ fontSize: 10, color: C.gray400, whiteSpace: "nowrap" }}>
+                          {d.toLocaleDateString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 12, color: C.gray600, marginTop: 2 }}>{lg.details}</div>
+                      <div style={{ fontSize: 10, color: C.gray400, marginTop: 4 }}>Oleh: {lg.users?.full_name || "Admin"}</div>
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>

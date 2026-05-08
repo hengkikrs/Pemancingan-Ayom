@@ -89,15 +89,27 @@ export function AuthProvider({ children }) {
     if (u) {
       setUser(u);
       localStorage.setItem("ayom_user", JSON.stringify(u));
+      supabase.from("activity_logs").insert({
+        action_type: "LOGIN",
+        details: `Login berhasil sebagai ${u.username}`,
+        created_by: u.id && u.id.length > 20 ? u.id : null,
+      }).then(() => {});
       return true;
     }
     return false;
   }, []);
 
   const logout = useCallback(() => {
+    if (user) {
+      supabase.from("activity_logs").insert({
+        action_type: "LOGOUT",
+        details: `Logout ${user.username}`,
+        created_by: user.id && user.id.length > 20 ? user.id : null,
+      }).then(() => {});
+    }
     setUser(null);
     localStorage.removeItem("ayom_user");
-  }, []);
+  }, [user]);
 
   return (
     <AuthCtx.Provider value={{ user, loading, login, logout }}>
