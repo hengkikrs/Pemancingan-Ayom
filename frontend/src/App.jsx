@@ -23,8 +23,9 @@ import autoTable from "jspdf-autotable";
 // ─── Supabase guard ────────────────────────────────────────
 // Kalau credentials belum diisi, pakai local state saja
 const SB_URL = import.meta.env.VITE_SUPABASE_URL || "";
+const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 const SB_READY =
-  SB_URL && !SB_URL.includes("placeholder") && SB_URL.startsWith("https://");
+  SB_URL && SB_KEY && !SB_URL.includes("placeholder") && SB_URL.startsWith("https://");
 
 // ─── UUID helper ─────────────────────────────────────────────
 // Pastikan created_by selalu UUID valid atau null
