@@ -18,7 +18,7 @@ import { supabase } from "./supabase";
 import { useAuth, AuthProvider } from "./useAuth";
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 
 // ─── Supabase guard ────────────────────────────────────────
 // Kalau credentials belum diisi, pakai local state saja
@@ -3405,8 +3405,11 @@ function WarungTab({ bp }) {
                         {t.qty} {t.unit} ·{" "}
                         {t.payment_type === "kasbon"
                           ? `📝 ${t.kasbon_name}`
-                          : "💵"}{" "}
-                        · {t.users?.full_name || "—"}
+                          : t.customer_name
+                            ? `💵 ${t.customer_name}`
+                            : "💵"}{" "}
+                        {t.notes && <span style={{ color: C.gray400 }}>· 📝 {t.notes}</span>}
+                        <span style={{ color: C.gray400 }}>· {t.users?.full_name || "—"}</span>
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -4114,7 +4117,7 @@ function LaporanTab({ bp }) {
 
         tableData.push(["", "", "TOTAL PENDAPATAN", fmt(total)]);
 
-        doc.autoTable({
+        autoTable(doc, {
           startY: 34,
           head: [["Tipe", "Tanggal", "Deskripsi", "Pendapatan"]],
           body: tableData,

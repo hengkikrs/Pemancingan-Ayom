@@ -265,6 +265,10 @@ CREATE POLICY "galatama_sessions_update"
   ON public.galatama_sessions FOR UPDATE
   USING (TRUE);
 
+CREATE POLICY "galatama_sessions_delete"
+  ON public.galatama_sessions FOR DELETE
+  USING (TRUE);
+
 -- galatama_kasbon
 CREATE POLICY "galatama_kasbon_select"
   ON public.galatama_kasbon FOR SELECT USING (TRUE);
@@ -274,6 +278,9 @@ CREATE POLICY "galatama_kasbon_insert"
 
 CREATE POLICY "galatama_kasbon_update"
   ON public.galatama_kasbon FOR UPDATE USING (TRUE);
+
+CREATE POLICY "galatama_kasbon_delete"
+  ON public.galatama_kasbon FOR DELETE USING (TRUE);
 
 -- products
 CREATE POLICY "products_select"
@@ -285,12 +292,21 @@ CREATE POLICY "products_insert"
 CREATE POLICY "products_update"
   ON public.products FOR UPDATE USING (TRUE);
 
+CREATE POLICY "products_delete"
+  ON public.products FOR DELETE USING (TRUE);
+
 -- warung_transactions
 CREATE POLICY "warung_transactions_select"
   ON public.warung_transactions FOR SELECT USING (TRUE);
 
 CREATE POLICY "warung_transactions_insert"
   ON public.warung_transactions FOR INSERT WITH CHECK (TRUE);
+
+CREATE POLICY "warung_transactions_update"
+  ON public.warung_transactions FOR UPDATE USING (TRUE);
+
+CREATE POLICY "warung_transactions_delete"
+  ON public.warung_transactions FOR DELETE USING (TRUE);
 
 -- open_bills
 CREATE POLICY "open_bills_select"
@@ -302,12 +318,42 @@ CREATE POLICY "open_bills_insert"
 CREATE POLICY "open_bills_update"
   ON public.open_bills FOR UPDATE USING (TRUE);
 
+CREATE POLICY "open_bills_delete"
+  ON public.open_bills FOR DELETE USING (TRUE);
+
 -- stock_adjustments
 CREATE POLICY "stock_adjustments_select"
   ON public.stock_adjustments FOR SELECT USING (TRUE);
 
 CREATE POLICY "stock_adjustments_insert"
   ON public.stock_adjustments FOR INSERT WITH CHECK (TRUE);
+
+CREATE POLICY "stock_adjustments_delete"
+  ON public.stock_adjustments FOR DELETE USING (TRUE);
+
+-- drawer_validations
+ALTER TABLE public.drawer_validations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "drawer_validations_select"
+  ON public.drawer_validations FOR SELECT USING (TRUE);
+
+CREATE POLICY "drawer_validations_insert"
+  ON public.drawer_validations FOR INSERT WITH CHECK (TRUE);
+
+CREATE POLICY "drawer_validations_update"
+  ON public.drawer_validations FOR UPDATE USING (TRUE);
+
+CREATE POLICY "drawer_validations_delete"
+  ON public.drawer_validations FOR DELETE USING (TRUE);
+
+-- activity_logs
+ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "activity_logs_select"
+  ON public.activity_logs FOR SELECT USING (TRUE);
+
+CREATE POLICY "activity_logs_insert"
+  ON public.activity_logs FOR INSERT WITH CHECK (TRUE);
 
 
 -- =============================================================
