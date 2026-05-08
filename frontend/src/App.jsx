@@ -1221,8 +1221,8 @@ function StatRing({ pct, color, size = 64, stroke = 7, label, value }) {
         <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center",
           fontSize: 11, fontWeight: 800, color, fontFamily: "'DM Mono',monospace" }}>{pct}%</div>
       </div>
-      <div style={{ fontSize: 10, color: C.gray500, fontWeight: 600, textAlign: "center" }}>{label}</div>
-      <div style={{ fontSize: 12, fontWeight: 800, color: C.gray800, fontFamily: "'DM Mono',monospace" }}>{value}</div>
+      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", fontWeight: 600, textAlign: "center" }}>{label}</div>
+      <div style={{ fontSize: 12, fontWeight: 800, color: C.white, fontFamily: "'DM Mono',monospace" }}>{value}</div>
     </div>
   );
 }
@@ -1902,8 +1902,8 @@ function GalSessionList({ sessions, setKasbonModal }) {
 // ─────────────────────────────────────────────────────────
 function GalatamaTab({ bp }) {
   const { user } = useAuth();
-  const { sessions, setSessions } = useSessions();
-  const { kasbon, setKasbon } = useGalKasbon();
+  const { sessions, setSessions, reload: reloadSessions } = useSessions();
+  const { kasbon, setKasbon, reload: reloadKasbon } = useGalKasbon();
   const { isMobile } = bp;
   const [subTab, setSubTab] = useState("sessions");
   const [showForm, setShowForm] = useState(false);
@@ -1956,6 +1956,7 @@ function GalatamaTab({ bp }) {
         setToast({ msg: "Gagal: " + error.message, type: "error" });
         return;
       }
+      reloadSessions(); // Segera reload data setelah insert
     } else {
       // Demo mode: simpan ke local state
       setSessions((prev) => [
@@ -1994,6 +1995,7 @@ function GalatamaTab({ bp }) {
         setToast({ msg: error.message, type: "error" });
         return;
       }
+      reloadKasbon(); // Segera reload data setelah insert
     } else {
       setKasbon((prev) => [
         {
@@ -2298,9 +2300,9 @@ function GalatamaTab({ bp }) {
 // ─────────────────────────────────────────────────────────
 function WarungTab({ bp }) {
   const { user } = useAuth();
-  const { products, setProducts } = useProducts();
-  const { txns, setTxns } = useTransactions(today());
-  const { bills, setBills } = useOpenBills();
+  const { products, setProducts, reload: reloadProducts } = useProducts();
+  const { txns, setTxns, reload: reloadTxns } = useTransactions(today());
+  const { bills, setBills, reload: reloadBills } = useOpenBills();
   const { isMobile } = bp;
   const [subTab, setSubTab] = useState("pos");
   const [posForm, setPosForm] = useState({
@@ -2458,6 +2460,13 @@ function WarungTab({ bp }) {
         });
       }
     }
+    
+    if (SB_READY) {
+      reloadTxns();
+      reloadProducts();
+      if (billMode === "kasbon") reloadBills();
+    }
+
     setSaving(false);
     setToast({ msg: "Transaksi berhasil!", type: "success" });
     setPosForm({ productId: "", qty: "", unit: "pcs", billName: "" });
@@ -2473,6 +2482,7 @@ function WarungTab({ bp }) {
           settled_by: safeUserId(user),
         })
         .eq("id", bill.id);
+      reloadBills();
     } else {
       setBills((prev) => prev.filter((b) => b.id !== bill.id));
     }
@@ -2521,6 +2531,7 @@ function WarungTab({ bp }) {
             ? { stok_batang: after }
             : { stok: after };
       await supabase.from("products").update(upd).eq("id", p.id);
+      reloadProducts();
     } else {
       setProducts((prev) =>
         prev.map((prod) => {
@@ -2556,6 +2567,7 @@ function WarungTab({ bp }) {
         setToast({ msg: error.message, type: "error" });
         return;
       }
+      reloadProducts();
     } else {
       setProducts((prev) => [...prev, { ...prod, id: Date.now().toString() }]);
     }
@@ -2572,9 +2584,10 @@ function WarungTab({ bp }) {
 
   const deleteProd = async (id) => {
     if (!confirm("Hapus produk ini?")) return;
-    if (SB_READY)
+    if (SB_READY) {
       await supabase.from("products").update({ is_active: false }).eq("id", id);
-    else setProducts((prev) => prev.filter((p) => p.id !== id));
+      reloadProducts();
+    } else setProducts((prev) => prev.filter((p) => p.id !== id));
     setToast({ msg: "Produk dihapus", type: "success" });
   };
 
