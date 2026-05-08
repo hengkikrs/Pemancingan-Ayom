@@ -2387,7 +2387,7 @@ function WarungTab({ bp }) {
     };
 
     if (SB_READY) {
-      const { users, ...txData } = tx;
+      const { users, id, ...txData } = tx;
       await supabase
         .from("warung_transactions")
         .insert({ ...txData, created_by: safeUserId(user) });
@@ -2415,14 +2415,37 @@ function WarungTab({ bp }) {
       );
     }
     if (billMode === "kasbon" && posForm.billName) {
-      const billItem = {
-        id: Date.now().toString(),
-        angler_name: posForm.billName,
-        total_amount: revenue,
-        status: "open",
-        bill_date: today(),
-      };
-      if (!SB_READY)
+      if (SB_READY) {
+        const { data: exBills } = await supabase
+          .from("open_bills")
+          .select("*")
+          .eq("angler_name", posForm.billName)
+          .eq("status", "open")
+          .limit(1);
+        
+        if (exBills && exBills.length > 0) {
+          await supabase
+            .from("open_bills")
+            .update({ total_amount: exBills[0].total_amount + revenue })
+            .eq("id", exBills[0].id);
+        } else {
+          await supabase
+            .from("open_bills")
+            .insert({
+              angler_name: posForm.billName,
+              total_amount: revenue,
+              status: "open",
+              bill_date: today(),
+            });
+        }
+      } else {
+        const billItem = {
+          id: Date.now().toString(),
+          angler_name: posForm.billName,
+          total_amount: revenue,
+          status: "open",
+          bill_date: today(),
+        };
         setBills((prev) => {
           const ex = prev.find((b) => b.angler_name === posForm.billName);
           if (ex)
@@ -2433,6 +2456,7 @@ function WarungTab({ bp }) {
             );
           return [...prev, billItem];
         });
+      }
     }
     setSaving(false);
     setToast({ msg: "Transaksi berhasil!", type: "success" });
