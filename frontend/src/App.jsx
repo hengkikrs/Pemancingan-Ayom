@@ -107,8 +107,8 @@ const fmtShort = (n) =>
   n >= 1e6
     ? `${(n / 1e6).toFixed(1)}jt`
     : n >= 1e3
-      ? `${(n / 1e3).toFixed(0)}rb`
-      : String(Math.round(n ?? 0));
+      ? `${Math.floor(n / 1e3).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")}rb`
+      : String(Math.floor(n ?? 0));
 const today = () => new Date().toISOString().slice(0, 10);
 
 function calcGal(p) {
@@ -1311,6 +1311,12 @@ function DashboardTab({ bp }) {
   const { sessions } = useSessions();
   const { txns } = useTransactions();
   const { isMobile } = bp;
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // ── Computed data ────────────────────────────────────────
   const galRevTotal = sessions.reduce((a, s) => a + s.participants * TICKET_PRICE, 0);
@@ -1398,7 +1404,6 @@ function DashboardTab({ bp }) {
             <div style={{ fontSize: 12, opacity: .6, marginTop: 8, display: "flex", gap: 16, flexWrap: "wrap" }}>
               <span>🎣 {sessions.length} sesi</span>
               <span>🛒 {txns.length} transaksi</span>
-              <span>📅 Hari ini: {todaySessions.length} sesi, {todayTxns.length} transaksi</span>
             </div>
           </div>
           {!isMobile && (
@@ -1413,12 +1418,15 @@ function DashboardTab({ bp }) {
         {(todaySessions.length > 0 || todayTxns.length > 0) && (
           <div style={{
             marginTop: 14, padding: "8px 14px", background: "rgba(255,255,255,0.08)",
-            borderRadius: 10, display: "flex", gap: 20, flexWrap: "wrap"
+            borderRadius: 10, display: "flex", flexDirection: "column", gap: 4
           }}>
-            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", fontWeight: 600 }}>
-              ⚡ Hari ini — Galatama: <b style={{ color: C.sky }}>{fmt(todaySessions.reduce((a, s) => a + s.participants * TICKET_PRICE * 0.5, 0))}</b>
-              &nbsp;· Warung: <b style={{ color: C.teal }}>{fmt(todayRev)}</b>
-            </span>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", fontWeight: 600 }}>
+              ⚡ {currentTime.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · {currentTime.toLocaleTimeString("id-ID")}
+            </div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", fontWeight: 600 }}>
+              Keuntungan = Galatama: <b style={{ color: C.sky }}>{fmt(todaySessions.reduce((a, s) => a + s.participants * TICKET_PRICE * 0.5, 0))}</b>
+              · Warung: <b style={{ color: C.teal }}>{fmt(todayTxns.reduce((a, t) => a + parseFloat(t.profit || 0), 0))}</b>
+            </div>
           </div>
         )}
       </div>
