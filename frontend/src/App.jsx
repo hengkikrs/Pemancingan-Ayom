@@ -1312,6 +1312,7 @@ function RankRow({ rank, name, value, color, max }) {
 function DashboardTab({ bp }) {
   const { sessions } = useSessions();
   const { txns } = useTransactions();
+  const { kasbon } = useGalKasbon();
   const { isMobile } = bp;
   const [currentTime, setCurrentTime] = useState(new Date());
   const [periodFilter, setPeriodFilter] = useState("daily");
@@ -1343,10 +1344,17 @@ function DashboardTab({ bp }) {
   const galRevTotal = filtSessions.reduce((a, s) => a + s.participants * TICKET_PRICE, 0);
   const galProfTotal = galRevTotal * 0.5;
   const galPrizeTotal = galRevTotal * 0.5;
+  
+  const totalKasbon = kasbon.reduce((a, k) => a + parseFloat(k.amount || 0), 0);
+  const galRevAdjusted = Math.max(0, galRevTotal - totalKasbon);
+  const galProfAdjusted = galRevAdjusted * 0.5;
+  const galPrizeAdjusted = galRevAdjusted * 0.5;
+  const kasUsedForPrize = galPrizeTotal - galPrizeAdjusted;
+  
   const warRevTotal = cashTxns.reduce((a, t) => a + parseFloat(t.revenue || 0), 0);
   const warProfTotal = cashTxns.reduce((a, t) => a + parseFloat(t.profit || 0), 0);
-  const totalOmzet = galRevTotal + warRevTotal;
-  const totalProfit = galProfTotal + warProfTotal;
+  const totalOmzet = galRevAdjusted + warRevTotal;
+  const totalProfit = galProfAdjusted + warProfTotal;
 
   // Trend chart data
   const dateMap = {};
@@ -1465,12 +1473,12 @@ function DashboardTab({ bp }) {
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3,1fr)", gap: 12 }}>
         {[
           {
-            label: "Omzet Galatama", value: fmtShort(galRevTotal), sub: `${filtSessions.length} sesi ${periodLabel}`, color: C.blueL, icon: "🎣",
-            detail: `Tiket ${fmt(TICKET_PRICE)}/orang`
+            label: "Omzet Galatama", value: fmtShort(galRevAdjusted), sub: `${filtSessions.length} sesi ${periodLabel}`, color: C.blueL, icon: "🎣",
+            detail: totalKasbon > 0 ? `📝 Kasbon ${fmt(totalKasbon)} pending` : `Tiket ${fmt(TICKET_PRICE)}/orang`
           },
           {
-            label: "Profit Kolam", value: fmtShort(galProfTotal), sub: "50% dari omzet", color: C.teal, icon: "💰",
-            detail: `Prize pool: ${fmtShort(galPrizeTotal)}`
+            label: "Profit Kolam", value: fmtShort(galProfAdjusted), sub: "50% dari omzet", color: C.teal, icon: "💰",
+            detail: kasUsedForPrize > 0 ? `💵 Kascover: ${fmt(kasUsedForPrize)}` : `Prize pool: ${fmtShort(galPrizeAdjusted)}`
           },
           {
             label: "Omzet Warung", value: fmtShort(warRevTotal), sub: `${filtTxns.length} transaksi ${periodLabel}`, color: C.amber, icon: "🛒",
@@ -1482,7 +1490,7 @@ function DashboardTab({ bp }) {
           },
           {
             label: "Total Omzet", value: fmtShort(totalOmzet), sub: "Gabungan", color: C.violet, icon: "📊",
-            detail: `Gal ${Math.round(galRevTotal / Math.max(totalOmzet, 1) * 100)}% · War ${Math.round(warRevTotal / Math.max(totalOmzet, 1) * 100)}%`
+            detail: `Gal ${Math.round(galRevAdjusted / Math.max(totalOmzet, 1) * 100)}% · War ${Math.round(warRevTotal / Math.max(totalOmzet, 1) * 100)}%`
           },
           {
             label: "Total Profit", value: fmtShort(totalProfit), sub: "Bersih gabungan", color: C.rose, icon: "🏆",
@@ -3003,15 +3011,19 @@ function WarungTab({ bp }) {
   };
 
   const deleteTxn = async (id) => {
-    if (!confirm("Yakin ingin menghapus transaksi ini?")) return;
-    
     const txn = txns.find(t => t.id === id);
     const prod = products.find(p => p.id === txn?.product_id);
+    const confirmMsg = txn 
+      ? `Hapus transaksi "${txn.product_name}" (${txn.qty} ${txn.unit}) senilai ${fmt(parseFloat(txn.revenue || 0))}?`
+      : "Yakin ingin menghapus transaksi ini?";
+    if (!confirm(confirmMsg)) return;
     
     if (SB_READY) {
+      setTxns(prev => prev.filter(t => t.id !== id));
       const { error } = await supabase.from("warung_transactions").delete().eq("id", id);
       if (error) {
         setToast({ msg: "Gagal: " + error.message, type: "error" });
+        reloadTxns();
         return;
       }
       if (prod) {
