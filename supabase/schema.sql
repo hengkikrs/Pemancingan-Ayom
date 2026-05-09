@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS public.warung_transactions (
   customer_name   TEXT,                            -- opsional untuk nama pelanggan cash
   notes           TEXT,                            -- opsional untuk catatan transaksi
   is_settled      BOOLEAN NOT NULL DEFAULT TRUE,
+  settled_at      TIMESTAMPTZ,
   created_by      UUID REFERENCES public.users (id) ON DELETE SET NULL,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
