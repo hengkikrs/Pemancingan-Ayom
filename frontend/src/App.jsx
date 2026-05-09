@@ -2661,6 +2661,15 @@ function WarungTab({ bp }) {
           : selected.harga_jual_batang
         : selected.harga_jual)
       : 0;
+  const previewProfit =
+    selected && posForm.qty
+      ? parseInt(posForm.qty || 0) *
+      (isCig
+        ? posForm.unit === "bungkus"
+          ? selected.harga_jual_bungkus - selected.harga_beli_bungkus
+          : selected.harga_jual_batang - (selected.harga_beli_bungkus / selected.batang_per_bungkus)
+        : selected.harga_jual - selected.harga_beli)
+      : 0;
 
   const handleSell = async () => {
     if (!selected || !posForm.qty) return;
@@ -3350,32 +3359,38 @@ function WarungTab({ bp }) {
                 />
               </Field>
               {previewTotal > 0 && (
-                <div
-                  style={{
-                    padding: 13,
-                    background: C.gray50,
-                    border: `1px solid ${C.gray200}`,
-                    borderRadius: 12,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span
-                    style={{ fontSize: 13, color: C.gray500, fontWeight: 600 }}
-                  >
-                    Total Bayar
-                  </span>
-                  <span
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div
                     style={{
-                      fontSize: 20,
-                      fontWeight: 800,
-                      color: C.blue,
-                      fontFamily: "'DM Mono',monospace",
+                      padding: 13,
+                      background: C.gray50,
+                      border: `1px solid ${C.gray200}`,
+                      borderRadius: 12,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
                     }}
                   >
-                    {fmt(previewTotal)}
-                  </span>
+                    <span
+                      style={{ fontSize: 13, color: C.gray500, fontWeight: 600 }}
+                    >
+                      Total Bayar
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 20,
+                        fontWeight: 800,
+                        color: C.blue,
+                        fontFamily: "'DM Mono',monospace",
+                      }}
+                    >
+                      {fmt(previewTotal)}
+                    </span>
+                  </div>
+<div style={{ padding: "8px 12px", background: "#E8F5E9", border: `1px solid ${C.emerald}40`, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: C.emerald, fontWeight: 600 }}>Keuntungan</span>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: C.emerald, fontFamily: "'DM Mono',monospace" }}>+{fmt(previewProfit)}</span>
+                  </div>
                 </div>
               )}
               <Btn
@@ -3448,6 +3463,7 @@ function WarungTab({ bp }) {
                                   <div style={{ fontWeight: 600, fontSize: 12, color: C.gray800 }}>{t.product_name}</div>
                                   <div style={{ fontSize: 10, color: C.gray400, marginTop: 1 }}>
                                     {t.qty} {t.unit} · {t.payment_type === "kasbon" ? `📝 ${t.kasbon_name}` : t.customer_name ? `💵 ${t.customer_name}` : "💵"}{t.notes && <span> · 📝 {t.notes}</span>}
+                                    <span style={{ color: C.emerald, fontWeight: 600 }}> · +{fmt(parseFloat(t.profit || 0))}</span>
                                   </div>
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
