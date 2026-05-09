@@ -1309,10 +1309,9 @@ function RankRow({ rank, name, value, color, max }) {
   );
 }
 
-function DashboardTab({ bp }) {
+function DashboardTab({ bp, kasbon }) {
   const { sessions } = useSessions();
   const { txns } = useTransactions();
-  const { kasbon } = useGalKasbon();
   const { isMobile } = bp;
   const [currentTime, setCurrentTime] = useState(new Date());
   const [periodFilter, setPeriodFilter] = useState("daily");
@@ -2002,10 +2001,9 @@ function GalSessionList({ sessions, setKasbonModal, onEditSession, onDeleteSessi
 // ─────────────────────────────────────────────────────────
 // GALATAMA TAB
 // ─────────────────────────────────────────────────────────
-function GalatamaTab({ bp }) {
+function GalatamaTab({ bp, kasbon, setKasbon, reloadKasbon }) {
   const { user } = useAuth();
   const { sessions: allSessions, setSessions, reload: reloadSessions } = useSessions();
-  const { kasbon, setKasbon, reload: reloadKasbon } = useGalKasbon();
   const { isMobile } = bp;
   const [subTab, setSubTab] = useState("sessions");
   const [showForm, setShowForm] = useState(false);
@@ -2150,6 +2148,7 @@ function GalatamaTab({ bp }) {
 
   const settleKasbon = async (id) => {
     if (SB_READY) {
+      setKasbon((prev) => prev.filter((k) => k.id !== id));
       await supabase
         .from("galatama_kasbon")
         .update({
@@ -4494,6 +4493,7 @@ function AppInner() {
   const [tab, setTab] = useState("dashboard");
   const bp = useBreakpoint();
   const { isDesktop, isMobile } = bp;
+  const { kasbon, setKasbon, reload: reloadKasbon } = useGalKasbon();
 
   if (loading)
     return (
@@ -4621,8 +4621,8 @@ function AppInner() {
             width: "100%",
           }}
         >
-          {tab === "dashboard" && <DashboardTab bp={bp} />}
-          {tab === "galatama" && <GalatamaTab bp={bp} />}
+          {tab === "dashboard" && <DashboardTab bp={bp} kasbon={kasbon} />}
+          {tab === "galatama" && <GalatamaTab bp={bp} kasbon={kasbon} setKasbon={setKasbon} reloadKasbon={reloadKasbon} />}
           {tab === "warung" && <WarungTab bp={bp} />}
           {tab === "laporan" && <LaporanTab bp={bp} />}
         </main>
