@@ -1879,7 +1879,7 @@ function GalForm({ form, update, preview, saving, onSave, isMobile }) {
   );
 }
 
-function GalSessionList({ sessions, setKasbonModal, onEditSession, onDeleteSession }) {
+function GalSessionList({ sessions, kasbon, setKasbonModal, onEditSession, onDeleteSession }) {
   const [expandedDay, setExpandedDay] = useState(null);
 
   const grouped = sessions.reduce((acc, s) => {
@@ -1888,6 +1888,10 @@ function GalSessionList({ sessions, setKasbonModal, onEditSession, onDeleteSessi
     return acc;
   }, {});
   const days = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+  const getSessionKasbon = (sessionId) => {
+    return kasbon.filter(k => k.session_id === sessionId);
+  };
 
   return (
     <Card>
@@ -1969,12 +1973,23 @@ function GalSessionList({ sessions, setKasbonModal, onEditSession, onDeleteSessi
                         </div>
                         <PBar value={s.participants} max={MAX_ANGLERS} color={col} />
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 4, marginTop: 7 }}>
-                          {[["Omzet", fmt(g.total), C.gray600], ["Profit", fmt(g.profit), C.emerald], ["Hadiah", fmt(g.pool), C.amber]].map(([l, v, c]) => (
-                            <div key={l} style={{ padding: "4px 7px", background: C.gray50, borderRadius: 6, border: `1px solid ${C.gray200}` }}>
-                              <div style={{ fontSize: 8, fontWeight: 700, color: C.gray400, textTransform: "uppercase", marginBottom: 1 }}>{l}</div>
-                              <div style={{ fontSize: 10, fontWeight: 800, color: c, fontFamily: "'DM Mono',monospace" }}>{v}</div>
-                            </div>
-                          ))}
+                          {(() => {
+                            const sessionKasbon = getSessionKasbon(s.id);
+                            const hasKasbon = sessionKasbon.length > 0;
+                            const totalKasbon = sessionKasbon.reduce((a, k) => a + parseFloat(k.amount || 0), 0);
+                            const items = [["Omzet", fmt(g.total), C.gray600], ["Profit", fmt(g.profit), C.emerald]];
+                            if (hasKasbon) {
+                              items.push(["Kasbon", fmt(totalKasbon), C.rose]);
+                            } else {
+                              items.push(["Hadiah", fmt(g.pool), C.amber]);
+                            }
+                            return items.map(([l, v, c]) => (
+                              <div key={l} style={{ padding: "4px 7px", background: hasKasbon && l === "Kasbon" ? "#FFEBEE" : C.gray50, borderRadius: 6, border: `1px solid ${hasKasbon && l === "Kasbon" ? "#FFCDD2" : C.gray200}` }}>
+                                <div style={{ fontSize: 8, fontWeight: 700, color: hasKasbon && l === "Kasbon" ? C.rose : C.gray400, textTransform: "uppercase", marginBottom: 1 }}>{l}</div>
+                                <div style={{ fontSize: 10, fontWeight: 800, color: c, fontFamily: "'DM Mono',monospace" }}>{v}</div>
+                              </div>
+                            ));
+                          })()}
                         </div>
                         <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 2 }}>
                           {[["🥇", s.winner1_name, fmt(g.j1)], ["🥈", s.winner2_name, fmt(g.j2)], ...(s.winner3_name ? [["🥉", s.winner3_name, fmt(g.j3)]] : [])].map(([ic, nm, pr]) => (
@@ -2355,6 +2370,7 @@ function GalatamaTab({ bp, kasbon, setKasbon, reloadKasbon }) {
               />
               <GalSessionList
                 sessions={sessions}
+                kasbon={kasbon}
                 setKasbonModal={setKasbonModal}
                 onEditSession={openEditSession}
                 onDeleteSession={deleteSession}
@@ -2363,6 +2379,7 @@ function GalatamaTab({ bp, kasbon, setKasbon, reloadKasbon }) {
           ) : (
             <GalSessionList
               sessions={sessions}
+              kasbon={kasbon}
               setKasbonModal={setKasbonModal}
               onEditSession={openEditSession}
               onDeleteSession={deleteSession}
@@ -3098,7 +3115,7 @@ function WarungTab({ bp }) {
           onClose={() => setToast(null)}
         />
       )}
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: 10 }}>
         <KpiCard
           label="Omzet"
           value={fmtShort(totalRev)}
