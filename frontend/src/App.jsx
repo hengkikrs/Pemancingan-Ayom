@@ -1017,6 +1017,7 @@ const NAV = [
   { key: "dashboard", label: "Dashboard", icon: "📊" },
   { key: "galatama", label: "Galatama", icon: "🎣" },
   { key: "warung", label: "Warung", icon: "🛒" },
+  { key: "keuangan", label: "Keuangan", icon: "💰" },
   { key: "laporan", label: "Laporan", icon: "📋" },
 ];
 
@@ -3981,6 +3982,181 @@ function WarungTab({ bp }) {
 }
 
 // ─────────────────────────────────────────────────────────
+// KEUANGAN
+// ─────────────────────────────────────────────────────────
+function KeuanganTab({ bp }) {
+  const { user } = useAuth();
+  const { sessions } = useSessions();
+  const { txns } = useTransactions();
+  const { bills } = useOpenBills();
+  const { kasbon } = useGalKasbon();
+  const { isMobile } = bp;
+  
+  const [periodFilter, setPeriodFilter] = useState("daily");
+  const [accountFilter, setAccountFilter] = useState("all");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [modalForm, setModalForm] = useState({ amount: "", notes: "" });
+  const [toast, setToast] = useState(null);
+  
+  const getDateRange = (p) => {
+    const now = new Date();
+    const d = now.toISOString().slice(0, 10);
+    if (p === "daily") return { start: d, end: d };
+    if (p === "weekly") {
+      const start = new Date(now.getTime() - 6 * 86400000).toISOString().slice(0, 10);
+      return { start, end: d };
+    }
+    if (p === "monthly") {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+      return { start, end: d };
+    }
+    const start = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
+    return { start, end: d };
+  };
+
+  const { start: filterStart, end: filterEnd } = getDateRange(periodFilter);
+  const periodLabel = periodFilter === "daily" ? "hari ini" : periodFilter === "weekly" ? "minggu ini" : periodFilter === "monthly" ? "bulan ini" : "tahun ini";
+
+  const filtSessions = sessions.filter(s => s.session_date >= filterStart && s.session_date <= filterEnd);
+  const filtTxns = txns.filter(t => t.trans_date >= filterStart && t.trans_date <= filterEnd);
+  
+  const galRevTotal = filtSessions.reduce((a, s) => a + s.participants * TICKET_PRICE, 0);
+  const totalKasbonGalatama = kasbon.reduce((a, k) => a + parseFloat(k.amount || 0), 0);
+  const galRevAdjusted = Math.max(0, galRevTotal - totalKasbonGalatama);
+  const galProfit = galRevAdjusted * 0.5;
+  
+  const cashTxns = filtTxns.filter(t => t.payment_type === "cash" || (t.payment_type === "kasbon" && t.is_settled));
+  const warRevenue = cashTxns.reduce((a, t) => a + parseFloat(t.revenue || 0), 0);
+  const warProfit = cashTxns.reduce((a, t) => a + parseFloat(t.profit || 0), 0);
+  
+  const totalProfit = galProfit + warProfit;
+  const profitPerAkun = totalProfit / 4;
+  
+  const totalModal = 5000000;
+  const tambahanModal = 0;
+  const totalKas = totalProfit;
+  
+  const accounts = [
+    { key: "inay", name: "Inay", color: C.violet, profit: profitPerAkun },
+    { key: "gun", name: "Gun", color: C.blue, profit: profitPerAkun },
+    { key: "wembi", name: "Wembi", color: C.teal, profit: profitPerAkun },
+    { key: "masuk_kas", name: "Masuk Kas", color: C.amber, profit: profitPerAkun },
+  ];
+
+  const filterAkun = accountFilter === "all" ? accounts : accounts.filter(a => a.key === accountFilter);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: 10 }}>
+        <KpiCard label="Modal Awal" value={fmtShort(totalModal)} sub="Dana operasional" color={C.navy} icon="💵" />
+        <KpiCard label="Total Profit" value={fmtShort(totalProfit)} sub={periodLabel} color={C.emerald} icon="💰" />
+        <KpiCard label="Jumlah Kas" value={fmtShort(totalKas)} sub="Tersedia" color={C.blueL} icon="🏦" />
+        <KpiCard label="Modal Tambahan" value={fmtShort(tambahanModal)} sub=" periode ini" color={C.amber} icon="➕" />
+      </div>
+
+      <div style={{ display: "flex", gap: 6 }}>
+        {[["daily", "📅 Harian"], ["weekly", "📆 Mingguan"], ["monthly", "📅 Bulanan"], ["yearly", "📅 Tahunan"]].map(([p, l]) => (
+          <button key={p} onClick={() => setPeriodFilter(p)} style={{ flexShrink: 0, padding: "7px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit", background: periodFilter === p ? C.blue : C.gray100, color: periodFilter === p ? C.white : C.gray500, fontWeight: periodFilter === p ? 700 : 500, fontSize: 12 }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      <Card>
+        <CardHdr title="Pembagian Profit" sub={"Total: " + fmt(totalProfit) + " (" + periodLabel + ")"} action={
+          <Btn onClick={() => setShowAddModal(true)} variant="secondary" style={{ padding: "6px 12px", fontSize: 12 }}>
+            ➕ Tambah Modal
+          </Btn>
+        } />
+        
+        <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+          <button onClick={() => setAccountFilter("all")} style={{ padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit", background: accountFilter === "all" ? C.blue : C.gray100, color: accountFilter === "all" ? C.white : C.gray500, fontWeight: 600, fontSize: 11 }}>
+            Semua
+          </button>
+          {accounts.map(a => (
+            <button key={a.key} onClick={() => setAccountFilter(a.key)} style={{ padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit", background: accountFilter === a.key ? a.color : C.gray100, color: accountFilter === a.key ? C.white : C.gray500, fontWeight: 600, fontSize: 11 }}>
+              {a.name}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4,1fr)", gap: 12 }}>
+          {filterAkun.map((akun) => (
+            <div key={akun.key} style={{ padding: 16, background: akun.color + "10", border: "1.5px solid " + akun.color + "40", borderRadius: 14, textAlign: "center" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: akun.color, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{akun.name}</div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: C.gray800, fontFamily: "'DM Mono',monospace" }}>{fmt(akun.profit)}</div>
+              <div style={{ fontSize: 10, color: C.gray400, marginTop: 4 }}>25% dari profit</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card>
+        <CardHdr title="Rincian Keuangan" sub={periodLabel} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
+            <div style={{ padding: 14, background: C.pale, borderRadius: 12, border: "1px solid #BBDEFB" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.blue, textTransform: "uppercase", marginBottom: 8 }}>Galatama</div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: C.gray500 }}>Omzet</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.gray800, fontFamily: "'DM Mono',monospace" }}>{fmt(galRevAdjusted)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: C.gray500 }}>Kasbon Terpakai</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.rose, fontFamily: "'DM Mono',monospace" }}>-{fmt(totalKasbonGalatama)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 6, borderTop: "1px solid #E2E8F0" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.gray700 }}>Profit</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: C.emerald, fontFamily: "'DM Mono',monospace" }}>{fmt(galProfit)}</span>
+              </div>
+            </div>
+            <div style={{ padding: 14, background: C.pale, borderRadius: 12, border: "1px solid #BBDEFB" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.amber, textTransform: "uppercase", marginBottom: 8 }}>Warung</div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: C.gray500 }}>Omzet</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.gray800, fontFamily: "'DM Mono',monospace" }}>{fmt(warRevenue)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: C.gray500 }}>Margin</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.gray800, fontFamily: "'DM Mono',monospace" }}>{warRevenue > 0 ? Math.round((warProfit / warRevenue) * 100) : 0}%</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 6, borderTop: "1px solid #E2E8F0" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.gray700 }}>Profit</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: C.emerald, fontFamily: "'DM Mono',monospace" }}>{fmt(warProfit)}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div style={{ padding: 14, background: C.gray50, borderRadius: 12, border: "1px solid #E2E8F0" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.gray700, marginBottom: 8 }}>Total Profit = Galatama + Warung</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 13, color: C.gray500 }}>{fmt(galProfit)} + {fmt(warProfit)}</span>
+              <span style={{ fontSize: 18, fontWeight: 900, color: C.navy, fontFamily: "'DM Mono',monospace" }}>{fmt(totalProfit)}</span>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Modal open={showAddModal} onClose={() => setShowAddModal(false)} title="Tambah Modal Tambahan">
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <Field label="Jumlah (Rp)">
+            <Inp type="number" min={0} placeholder="0" value={modalForm.amount} onChange={(e) => setModalForm(f => ({ ...f, amount: e.target.value }))} />
+          </Field>
+          <Field label="Catatan">
+            <Textarea placeholder="Keterangan modal tambahan..." value={modalForm.notes} onChange={(e) => setModalForm(f => ({ ...f, notes: e.target.value }))} />
+          </Field>
+          <Btn onClick={() => { setToast({ msg: "Modal tambahan berhasil dicatat!", type: "success" }); setShowAddModal(false); setModalForm({ amount: "", notes: "" }); }} style={{ width: "100%" }}>
+            💾 Simpan Modal
+          </Btn>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────
 // LAPORAN
 // ─────────────────────────────────────────────────────────
 function LaporanTab({ bp }) {
@@ -4644,6 +4820,7 @@ function AppInner() {
           {tab === "dashboard" && <DashboardTab bp={bp} kasbon={kasbon} />}
           {tab === "galatama" && <GalatamaTab bp={bp} kasbon={kasbon} setKasbon={setKasbon} reloadKasbon={reloadKasbon} />}
           {tab === "warung" && <WarungTab bp={bp} />}
+          {tab === "keuangan" && <KeuanganTab bp={bp} />}
           {tab === "laporan" && <LaporanTab bp={bp} />}
         </main>
       </div>
