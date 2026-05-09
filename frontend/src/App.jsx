@@ -1724,7 +1724,7 @@ function DashboardTab({ bp, kasbon }) {
 // ─────────────────────────────────────────────────────────
 // GALATAMA SESSION FORM — top-level component (bukan nested!)
 // ─────────────────────────────────────────────────────────
-function GalForm({ form, update, preview, saving, onSave }) {
+function GalForm({ form, update, preview, saving, onSave, isMobile }) {
   return (
     <Card>
       <CardHdr title="Tambah Sesi" />
@@ -1737,7 +1737,7 @@ function GalForm({ form, update, preview, saving, onSave }) {
           />
         </Field>
         <div
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}
+          style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}
         >
           <Field label="Sesi ke-">
             <Sel
@@ -2250,7 +2250,7 @@ function GalatamaTab({ bp, kasbon, setKasbon, reloadKasbon }) {
         />
       )}
       <div
-        style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}
+        style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: 10 }}
       >
         <KpiCard
           label="Omzet"
@@ -2334,6 +2334,7 @@ function GalatamaTab({ bp, kasbon, setKasbon, reloadKasbon }) {
               preview={preview}
               saving={saving}
               onSave={saveSession}
+              isMobile={isMobile}
             />
           )}
           {!isMobile ? (
@@ -2350,6 +2351,7 @@ function GalatamaTab({ bp, kasbon, setKasbon, reloadKasbon }) {
                 preview={preview}
                 saving={saving}
                 onSave={saveSession}
+                isMobile={isMobile}
               />
               <GalSessionList
                 sessions={sessions}
@@ -3096,7 +3098,7 @@ function WarungTab({ bp }) {
           onClose={() => setToast(null)}
         />
       )}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
         <KpiCard
           label="Omzet"
           value={fmtShort(totalRev)}
@@ -3331,7 +3333,7 @@ function WarungTab({ bp }) {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
+                    gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
                     gap: 8,
                   }}
                 >
@@ -3864,7 +3866,7 @@ function WarungTab({ bp }) {
             </Sel>
           </Field>
           <div
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}
+            style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}
           >
             <Field label="Stok Awal">
               <Inp
@@ -3970,6 +3972,7 @@ function LaporanTab({ bp }) {
   const { txns } = useTransactions();
   const { vals, setVals, reload: reloadVals } = useValidations();
   const { logs, reload: reloadLogs } = useActivityLogs();
+  const { isMobile } = bp;
   const [startDate, setStartDate] = useState(today());
   const [period, setPeriod] = useState("daily");
   const [loading, setLoading] = useState({ excel: false, pdf: false });
@@ -4188,7 +4191,7 @@ function LaporanTab({ bp }) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr",
+            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
             gap: 14,
             marginBottom: 20,
           }}
@@ -4306,7 +4309,7 @@ function LaporanTab({ bp }) {
           </div>
         </div>
         <div
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+          style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}
         >
           <Btn
             onClick={() => download("excel")}
