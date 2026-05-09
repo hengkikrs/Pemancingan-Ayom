@@ -2235,8 +2235,11 @@ function GalatamaTab({ bp }) {
     (a, s) => a + s.participants * TICKET_PRICE,
     0,
   );
-  const totProfit = totOmzet * 0.5,
-    totPrize = totOmzet * 0.5;
+  const totalKasbon = kasbon.reduce((a, k) => a + parseFloat(k.amount || 0), 0);
+  const totOmzetAdjusted = Math.max(0, totOmzet - totalKasbon);
+  const totProfit = totOmzetAdjusted * 0.5;
+  const totPrize = totOmzetAdjusted * 0.5;
+  const kasTerpakai = totalKasbon;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -2248,11 +2251,11 @@ function GalatamaTab({ bp }) {
         />
       )}
       <div
-        style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}
+        style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}
       >
         <KpiCard
           label="Omzet"
-          value={fmtShort(totOmzet)}
+          value={fmtShort(totOmzetAdjusted)}
           sub={`${sessions.length} sesi ${periodLabel}`}
           color={C.blueL}
           icon="🎣"
@@ -2267,9 +2270,16 @@ function GalatamaTab({ bp }) {
         <KpiCard
           label="Kasbon"
           value={kasbon.length}
-          sub={kasbon.reduce((a, k) => a + parseFloat(k.amount || 0), 0) > 0 ? fmt(kasbon.reduce((a, k) => a + parseFloat(k.amount || 0), 0)) + " tertunda" : "Lunas semua"}
+          sub={totalKasbon > 0 ? fmt(totalKasbon) + " tertunda" : "Lunas semua"}
           color={kasbon.length > 0 ? C.rose : C.emerald}
           icon="📝"
+        />
+        <KpiCard
+          label="Kas Terpakai"
+          value={fmt(kasTerpakai)}
+          sub={kasTerpakai > 0 ? "Menambal hadiah" : "-"}
+          color={kasTerpakai > 0 ? C.amber : C.gray300}
+          icon="💸"
         />
       </div>
 
