@@ -1109,7 +1109,7 @@ function Sidebar({ tab, setTab, user, logout }) {
         </div>
       </div>
       <div style={{ padding: "0 10px", flex: 1 }}>
-        {NAV.map((item) => {
+        {NAV.filter(item => !(item.key === "keuangan" && (user?.username?.toLowerCase() === "wembi" || user?.full_name?.toLowerCase() === "wembi"))).map((item) => {
           const active = tab === item.key;
           return (
             <button
@@ -1188,7 +1188,7 @@ function Sidebar({ tab, setTab, user, logout }) {
   );
 }
 
-function BottomNav({ tab, setTab }) {
+function BottomNav({ tab, setTab, user }) {
   return (
     <nav
       style={{
@@ -1204,7 +1204,7 @@ function BottomNav({ tab, setTab }) {
         boxShadow: "0 -2px 16px rgba(0,0,0,0.06)",
       }}
     >
-      {NAV.map((item) => {
+      {NAV.filter(item => !(item.key === "keuangan" && (user?.username?.toLowerCase() === "wembi" || user?.full_name?.toLowerCase() === "wembi"))).map((item) => {
         const active = tab === item.key;
         return (
           <button
@@ -1330,7 +1330,11 @@ function DashboardTab({ bp, kasbon }) {
       const start = new Date(now.getTime() - 6 * 86400000).toISOString().slice(0, 10);
       return { start, end: d };
     }
-    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    if (p === "monthly") {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+      return { start, end: d };
+    }
+    const start = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
     return { start, end: d };
   };
 
@@ -1397,7 +1401,7 @@ function DashboardTab({ bp, kasbon }) {
   const warMargin = warRevTotal > 0 ? Math.round((warProfTotal / warRevTotal) * 100) : 0;
   const galEffPct = Math.min(100, Math.round((filtSessions.length > 0 ? avgPax / MAX_ANGLERS : 0) * 100));
 
-  const periodLabel = periodFilter === "daily" ? "hari ini" : periodFilter === "weekly" ? "minggu ini" : "bulan ini";
+  const periodLabel = periodFilter === "daily" ? "hari ini" : periodFilter === "weekly" ? "minggu ini" : periodFilter === "monthly" ? "bulan ini" : "tahun ini";
   const todayTxns = filtTxns;
   const todayRev = warRevTotal;
   const todaySessions = filtSessions;
@@ -1462,7 +1466,7 @@ function DashboardTab({ bp, kasbon }) {
 
       {/* ── Period Filter ─────────────────────────────── */}
       <div style={{ display: "flex", gap: 6 }}>
-        {[["daily", "📅 Hari"], ["weekly", "📆 Minggu"], ["monthly", "📅 Bulan"]].map(([p, l]) => (
+        {[["daily", "📅 Hari"], ["weekly", "📆 Minggu"], ["monthly", "📅 Bulan"], ["yearly", "📅 Tahun"]].map(([p, l]) => (
           <button key={p} onClick={() => setPeriodFilter(p)} style={{ flexShrink: 0, padding: "7px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit", background: periodFilter === p ? C.blue : C.gray100, color: periodFilter === p ? C.white : C.gray500, fontWeight: periodFilter === p ? 700 : 500, fontSize: 12 }}>
             {l}
           </button>
@@ -2035,13 +2039,17 @@ function GalatamaTab({ bp, kasbon, setKasbon, reloadKasbon }) {
       const start = new Date(now.getTime() - 6 * 86400000).toISOString().slice(0, 10);
       return { start, end: d };
     }
-    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    if (p === "monthly") {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+      return { start, end: d };
+    }
+    const start = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
     return { start, end: d };
   };
 
   const { start: filterStart, end: filterEnd } = getDateRange(periodFilter);
   const sessions = allSessions.filter(s => s.session_date >= filterStart && s.session_date <= filterEnd);
-  const periodLabel = periodFilter === "daily" ? "hari ini" : periodFilter === "weekly" ? "minggu ini" : "bulan ini";
+  const periodLabel = periodFilter === "daily" ? "hari ini" : periodFilter === "weekly" ? "minggu ini" : periodFilter === "monthly" ? "bulan ini" : "tahun ini";
   const empty = {
     date: today(),
     sessionNum: "1",
@@ -2299,7 +2307,7 @@ function GalatamaTab({ bp, kasbon, setKasbon, reloadKasbon }) {
       </div>
 
       <div style={{ display: "flex", gap: 6 }}>
-        {[["daily", "📅 Hari"], ["weekly", "📆 Minggu"], ["monthly", "📅 Bulan"]].map(([p, l]) => (
+        {[["daily", "📅 Hari"], ["weekly", "📆 Minggu"], ["monthly", "📅 Bulan"], ["yearly", "📅 Tahun"]].map(([p, l]) => (
           <button key={p} onClick={() => setPeriodFilter(p)} style={{ flexShrink: 0, padding: "7px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit", background: periodFilter === p ? C.blue : C.gray100, color: periodFilter === p ? C.white : C.gray500, fontWeight: periodFilter === p ? 700 : 500, fontSize: 12 }}>
             {l}
           </button>
@@ -2628,7 +2636,11 @@ function WarungTab({ bp }) {
       const start = new Date(now.getTime() - 6 * 86400000).toISOString().slice(0, 10);
       return { start, end: d };
     }
-    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    if (p === "monthly") {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+      return { start, end: d };
+    }
+    const start = new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
     return { start, end: d };
   };
 
@@ -3120,7 +3132,7 @@ function WarungTab({ bp }) {
         <KpiCard
           label="Omzet"
           value={fmtShort(totalRev)}
-          sub={`${cashTxns.length} transaksi${kasbonTxns.length > 0 ? ` + ${kasbonTxns.length} kasbon` : ""} ${periodFilter === "daily" ? "hari ini" : periodFilter === "weekly" ? "minggu ini" : "bulan ini"}`}
+          sub={`${cashTxns.length} transaksi${kasbonTxns.length > 0 ? ` + ${kasbonTxns.length} kasbon` : ""} ${periodFilter === "daily" ? "hari ini" : periodFilter === "weekly" ? "minggu ini" : periodFilter === "monthly" ? "bulan ini" : "tahun ini"}`}
           color={C.blueL}
           icon="🛒"
         />
@@ -3148,7 +3160,7 @@ function WarungTab({ bp }) {
       </div>
 
       <div style={{ display: "flex", gap: 6 }}>
-        {[["daily", "📅 Hari"], ["weekly", "📆 Minggu"], ["monthly", "📅 Bulan"]].map(([p, l]) => (
+        {[["daily", "📅 Hari"], ["weekly", "📆 Minggu"], ["monthly", "📅 Bulan"], ["yearly", "📅 Tahun"]].map(([p, l]) => (
           <button key={p} onClick={() => setPeriodFilter(p)} style={{ flexShrink: 0, padding: "7px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit", background: periodFilter === p ? C.blue : C.gray100, color: periodFilter === p ? C.white : C.gray500, fontWeight: periodFilter === p ? 700 : 500, fontSize: 12 }}>
             {l}
           </button>
@@ -4824,7 +4836,7 @@ function AppInner() {
           {tab === "laporan" && <LaporanTab bp={bp} />}
         </main>
       </div>
-      {!isDesktop && <BottomNav tab={tab} setTab={setTab} />}
+      {!isDesktop && <BottomNav tab={tab} setTab={setTab} user={user} />}
     </div>
   );
 }
